@@ -1,0 +1,116 @@
+/**
+ * GET /api/social/ranking?type=translation|learning&limit=50
+ * ランキング取得
+ */
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+const SB_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL  ?? '';
+const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+
+function headers() {
+  return { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}`, 'Content-Type': 'application/json' };
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  const { type = 'translation', limit = '50' } = req.query as { type?: string; limit?: string };
+  if (!SB_URL) return res.status(200).json({ ranking: [] });
+
+  try {
+    if (type === 'translation') {
+      // 翻訳スコア合計ランキング
+      const r = await fetch(
+        `${SB_URL}/rest/v1/user_translations?select=user_id,score&order=score.desc&limit=${limit}`,
+        { headers: headers() },
+      );
+      const rows = r.ok ? await r.json() : [];
+
+      // user_id ごとにスコア合計
+      const scoreMap: Record<string, number> = {};
+      rows.forEach((row: any) => {
+        scoreMap[row.user_id] = (scoreMap[row.user_id] ?? 0) + (row.score ?? 0);
+      });
+
+      // プロフィール取得（ニックネーム）
+      const userIds = Object.keys(scoreMap).slice(0, 20);
+      let profiles: any[] = [];
+      if (userIds.length) {
+        const pr = await fetch(
+          `${SB_URL}/rest/v1/profiles?user_id=in.(${userIds.map(encodeURIComponent).join(',')})`,
+          { headers: headers() },
+        );
+        profiles = pr.ok ? await pr.json() : [];
+      }
+
+      const ranking = userIds
+        .map(uid => ({
+          user_id:  uid,
+          nickname: profiles.find((p: any) => p.user_id === uid)?.nickname ?? `Guest${uid.slice(-4)}`,
+          avatar:   profiles.find((p: any) => p.user_id === uid)?.avatar_emoji ?? '🎓',
+          score:    scoreMap[uid],
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, Number(limit));
+
+      return res.status(200).json({ ranking, type: 'translation' });
+    }
+
+    if (type === 'learning') {
+      // 学習ログ集計
+      const r = await fetch(
+        `${SB_URL}/rest/v1/learning_logs?select=user_id,type,correct,total&limit=1000`,
+        { headers: headers() },
+      );
+      const rows = r.ok ? await r.json() : [];
+
+      const map: Record<string, { sessions: number; correct: number; total: number }> = {};
+      rows.forEach((row: any) => {
+        if (!map[row.user_id]) map[row.user_id] = { sessions: 0, correct: 0, total: 0 };
+        map[row.user_id].sessions++;
+        map[row.user_id].correct += row.correct ?? 0;
+        map[row.user_id].total   += row.total   ?? 0;
+      });
+
+      // コイン残高
+      const walletRows = await fetch(
+        `${SB_URL}/rest/v1/user_wallet?select=user_id,coins&order=coins.desc&limit=100`,
+        { headers: headers() },
+      ).then(r => r.ok ? r.json() : []);
+
+      const userIds = Object.keys(map);
+      let profiles: any[] = [];
+      if (userIds.length) {
+        const pr = await fetch(
+          `${SB_URL}/rest/v1/profiles?user_id=in.(${userIds.slice(0,20).map(encodeURIComponent).join(',')})`,
+          { headers: headers() },
+        );
+        profiles = pr.ok ? await pr.json() : [];
+      }
+
+      const ranking = userIds
+        .map(uid => {
+          const m = map[uid];
+          const accuracy = m.total > 0 ? Math.round((m.correct / m.total) * 100) : 0;
+          const coins = walletRows.find((w: any) => w.user_id === uid)?.coins ?? 0;
+          return {
+            user_id:  uid,
+            nickname: profiles.find((p: any) => p.user_id === uid)?.nickname ?? `Guest${uid.slice(-4)}`,
+            avatar:   profiles.find((p: any) => p.user_id === uid)?.avatar_emoji ?? '🎓',
+            sessions: m.sessions,
+            accuracy,
+            coins,
+            rank_score: m.sessions * 10 + accuracy,
+          };
+        })
+        .sort((a, b) => b.rank_score - a.rank_score)
+        .slice(0, Number(limit));
+
+      return res.status(200).json({ ranking, type: 'learning' });
+    }
+
+    return res.status(400).json({ error: 'unknown type' });
+  } catch (err) {
+    console.error('[ranking]', err);
+    return res.status(500).json({ ranking: [] });
+  }
+}

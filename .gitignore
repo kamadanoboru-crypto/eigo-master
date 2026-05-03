@@ -1,0 +1,27 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Next.js
+/.next/
+/out/
+/build
+
+# env — 絶対にコミットしない
+.env
+.env.local
+.env.*.local
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+.vscode/settings.json
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
