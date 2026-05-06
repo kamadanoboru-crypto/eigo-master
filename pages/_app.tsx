@@ -25,9 +25,9 @@ export default function App({ Component, pageProps }: AppProps) {
       {adsenseClientId && (
         <Script
           async
+          strategy="afterInteractive"
           src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`}
           crossOrigin="anonymous"
-          strategy="afterInteractive"
         />
       )}
 
