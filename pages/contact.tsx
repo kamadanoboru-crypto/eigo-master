@@ -156,10 +156,10 @@ export default function Contact() {
 
         <footer className={styles.footer}>
           <div className={styles.footerLinks}>
-            <Link href="/"><a>ホーム</a></Link>
-            <Link href="/about"><a>について</a></Link>
-            <Link href="/privacy-policy"><a>プライバシーポリシー</a></Link>
-            <Link href="/terms"><a>利用規約</a></Link>
+            <Link href="/">ホーム</Link>
+            <Link href="/about">について</Link>
+            <Link href="/privacy-policy">プライバシーポリシー</Link>
+            <Link href="/terms">利用規約</Link>
           </div>
           <p>&copy; 2025 英語マスター. All rights reserved.</p>
         </footer>

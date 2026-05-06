@@ -48,10 +48,10 @@ export default function Home() {
             <p style={styles.appTagline}>YouTube・BBCニュースで英語を語順のまま理解する</p>
           </div>
           <nav style={styles.nav}>
-            <Link href="/about"><a style={styles.navLink}>について</a></Link>
-            <Link href="/privacy-policy"><a style={styles.navLink}>プライバシー</a></Link>
-            <Link href="/terms"><a style={styles.navLink}>利用規約</a></Link>
-            <Link href="/contact"><a style={styles.navLink}>お問い合わせ</a></Link>
+            <Link href="/about" style={styles.navLink}>について</Link>
+            <Link href="/privacy-policy" style={styles.navLink}>プライバシー</Link>
+            <Link href="/terms" style={styles.navLink}>利用規約</Link>
+            <Link href="/contact" style={styles.navLink}>お問い合わせ</Link>
           </nav>
         </header>
 
@@ -147,7 +147,7 @@ export default function Home() {
             <div style={styles.noticeBox}>
               <h3 style={styles.noticeTitle}>🔐 プライバシー</h3>
               <p style={styles.noticeText}>
-                ログインなしでも利用できますが、ブラウザのキャッシュをクリアするとデータが失われます。Googleログインで安全に学習履歴を保存できます。詳細は<Link href="/privacy-policy"><a style={{ color: '#2563eb' }}>プライバシーポリシー</a></Link>をご参照ください。
+                ログインなしでも利用できますが、ブラウザのキャッシュをクリアするとデータが失われます。Googleログインで安全に学習履歴を保存できます。詳細は<Link href="/privacy-policy" style={{ color: '#2563eb' }}>プライバシーポリシー</Link>をご参照ください。
               </p>
             </div>
           </div>
@@ -194,10 +194,10 @@ export default function Home() {
           <div style={styles.footerContent}>
             <p>&copy; 2025 英語マスター. All rights reserved.</p>
             <div style={styles.footerLinks}>
-              <Link href="/about"><a style={styles.footerLink}>について</a></Link>
-              <Link href="/privacy-policy"><a style={styles.footerLink}>プライバシー</a></Link>
-              <Link href="/terms"><a style={styles.footerLink}>利用規約</a></Link>
-              <Link href="/contact"><a style={styles.footerLink}>お問い合わせ</a></Link>
+            <Link href="/about" style={styles.footerLink}>について</Link>
+            <Link href="/privacy-policy" style={styles.footerLink}>プライバシー</Link>
+            <Link href="/terms" style={styles.footerLink}>利用規約</Link>
+            <Link href="/contact" style={styles.footerLink}>お問い合わせ</Link>
             </div>
           </div>
         </footer>

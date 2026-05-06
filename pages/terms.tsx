@@ -130,7 +130,7 @@ export default function Terms() {
             <section>
               <h2>9. 個人情報の取り扱い</h2>
               <p>
-                個人情報の取り扱いについては、<Link href="/privacy-policy"><a>プライバシーポリシー</a></Link>をご参照ください。
+                個人情報の取り扱いについては、<Link href="/privacy-policy">プライバシーポリシー</Link>をご参照ください。
               </p>
             </section>
 
@@ -151,7 +151,7 @@ export default function Terms() {
             <section>
               <h2>12. お問い合わせ</h2>
               <p>
-                本利用規約についてのご質問やご不明な点は、<Link href="/contact"><a>お問い合わせ</a></Link>ページからお気軽にご連絡ください。
+                本利用規約についてのご質問やご不明な点は、<Link href="/contact">お問い合わせ</Link>ページからお気軽にご連絡ください。
               </p>
             </section>
           </article>
@@ -159,10 +159,10 @@ export default function Terms() {
 
         <footer className={styles.footer}>
           <div className={styles.footerLinks}>
-            <Link href="/"><a>ホーム</a></Link>
-            <Link href="/about"><a>について</a></Link>
-            <Link href="/privacy-policy"><a>プライバシーポリシー</a></Link>
-            <Link href="/contact"><a>お問い合わせ</a></Link>
+            <Link href="/">ホーム</Link>
+            <Link href="/about">について</Link>
+            <Link href="/privacy-policy">プライバシーポリシー</Link>
+            <Link href="/contact">お問い合わせ</Link>
           </div>
           <p>&copy; 2025 英語マスター. All rights reserved.</p>
         </footer>

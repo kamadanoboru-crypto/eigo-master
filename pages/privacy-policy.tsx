@@ -119,7 +119,7 @@ export default function PrivacyPolicy() {
             <section>
               <h2>10. お問い合わせ</h2>
               <p>
-                本プライバシーポリシーについてのご質問やご不明な点は、<Link href="/contact"><a>お問い合わせ</a></Link>ページからお気軽にご連絡ください。
+                本プライバシーポリシーについてのご質問やご不明な点は、<Link href="/contact">お問い合わせ</Link>ページからお気軽にご連絡ください。
               </p>
             </section>
           </article>
@@ -127,10 +127,10 @@ export default function PrivacyPolicy() {
 
         <footer className={styles.footer}>
           <div className={styles.footerLinks}>
-            <Link href="/"><a>ホーム</a></Link>
-            <Link href="/about"><a>について</a></Link>
-            <Link href="/terms"><a>利用規約</a></Link>
-            <Link href="/contact"><a>お問い合わせ</a></Link>
+            <Link href="/">ホーム</Link>
+            <Link href="/about">について</Link>
+            <Link href="/terms">利用規約</Link>
+            <Link href="/contact">お問い合わせ</Link>
           </div>
           <p>&copy; 2025 英語マスター. All rights reserved.</p>
         </footer>
