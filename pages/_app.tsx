@@ -4,7 +4,7 @@ import Script from 'next/script';
 import './globals.css';
 
 export default function App({ Component, pageProps }: AppProps) {
-  const adsenseClientId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
+  const adsenseClientId = "ca-pub-4600703702846282";
 
   return (
     <>
