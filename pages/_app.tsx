@@ -26,7 +26,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <Script
           async
           strategy="afterInteractive"
-          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`}
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4600703702846282`}
           crossOrigin="anonymous"
         />
       )}
