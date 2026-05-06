@@ -39,6 +39,7 @@ export interface CachedQuiz {
   source_id:   string;
   level:       string;
   data:        unknown[];
+  hit_count:   number;
   created_at:  string;
   expires_at:  string | null;
 }

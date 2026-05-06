@@ -43,7 +43,7 @@ async function sbGet(table: string, filter: string): Promise<Record<string,unkno
   } catch { return []; }
 }
 
-async function sbUpsert(table: string, data: Record<string,unknown>): Promise<boolean> {
+async function sbUpsert(table: string, data: Record<string,unknown> | Wallet): Promise<boolean> {
   if (!READY) return false;
   try {
     const r = await fetch(`${SB_URL}/rest/v1/${table}`, {

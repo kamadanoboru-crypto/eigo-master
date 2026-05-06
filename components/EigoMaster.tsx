@@ -3,6 +3,8 @@ import React, { useState, useRef, useCallback, useEffect, Component } from "reac
 import type { ReactNode } from "react";
 import type { QuizQuestion } from "../types";
 
+const DEFAULT_THUMBNAIL = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="320" height="180"%3E%3Crect width="100%25" height="100%25" fill="%23E5E7EB"/%3E%3C/svg%3E';
+
 // ── Supabase Auth ヘルパー（Google OAuth）──────────────────────
 // supabase-js ライブラリ不要版
 const SB_URL_AUTH = (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_SUPABASE_URL) || "";
@@ -332,7 +334,7 @@ async function fetchQuiz(
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const d = await res.json() as { questions: QuizQuestion[]; fromCache: boolean; cacheKey: string };
-    console.log(`[quiz] ${d.fromCache ? 'CACHE HIT' : 'AI生成'}: ${d.cacheKey} (${d.questions.length}問)`);
+    console.log("[quiz] " + (d.fromCache ? 'CACHE HIT' : 'AI生成') + ": " + d.cacheKey + " (" + d.questions.length + "問)");
     return d.questions;
   } catch (err) {
     console.error('[quiz] fetch error:', err);
@@ -1132,6 +1134,7 @@ function EigoMasterInner() {
     needManual: false,  // 手動入力が必要か
   });
   const [manualText, setManualText] = useState('');
+  const [manualLoading, setManualLoading] = useState(false);
   // test results (persistent)
   const [TR, setTR] = useState<{
     word: {date:string;correct:number;total:number;score?:number}[];
@@ -1256,7 +1259,7 @@ function EigoMasterInner() {
         const uid = `user_id=eq.${userId}`;
         const [sLines, myL, tRes, uPts, uVids] = await Promise.all([
           sbFrom("saved_items").select(`*&${uid}&item_type=eq.caption&order=saved_at.desc`),
-          sbFrom("my_playlist").select(`*&${uid}`),
+          fetch('/api/list/get').then(r => r.json()),
           sbFrom("learning_logs").select(`*&${uid}&order=created_at.asc`),
           sbFrom("user_points").select(`*&${uid}`),
           sbFrom("user_videos").select(`*&${uid}&order=added_at.asc`),
@@ -1280,11 +1283,27 @@ function EigoMasterInner() {
         }
 
         // my playlist
-        if (Array.isArray(myL) && myL.length > 0) {
-          setMyList(myL.map(r => ({
-            videoId: r.video_id, title: r.title,
-            channelTitle: r.channel_title, thumbnail: r.thumbnail,
-          })));
+        if (Array.isArray(myL)) {
+          setMyList(myL.map((r: any) => {
+            const item = typeof r === 'object' && r ? r : {};
+            const videoId = typeof item.video_id === 'string' ? item.video_id : '';
+            const rawThumbnail = typeof item.thumbnail === 'string' ? item.thumbnail : '';
+            const thumbnail = rawThumbnail.trim()
+              ? rawThumbnail.trim()
+              : videoId
+                ? `https://img.youtube.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`
+                : DEFAULT_THUMBNAIL;
+            return {
+              videoId,
+              title: typeof item.title === 'string' ? item.title : '',
+              channelTitle: typeof item.channel_title === 'string' ? item.channel_title : '',
+              thumbnail,
+              chunks: Array.isArray(item.chunks) ? item.chunks : [],
+              originalText: typeof item.original_text === 'string' ? item.original_text : '',
+            };
+          }).filter(item => item.videoId || item.title || item.channelTitle));
+        } else {
+          setMyList([]);
         }
 
         // learning_logs から学習結果を復元（Phase3: 永続化）
@@ -1328,6 +1347,7 @@ function EigoMasterInner() {
         setDbReady(true);
       } catch (e) {
         console.error("DB load error:", e);
+        setMyList([]);
       } finally {
         setDbLoading(false);
       }
@@ -1405,18 +1425,25 @@ function EigoMasterInner() {
 
   const dbAddPlaylist = async (video) => {
     if (!SB_READY) return;
-    await sbFrom("my_playlist").insert({
-      user_id: userId,
-      video_id: video.videoId,
-      title: video.title,
-      channel_title: video.channelTitle,
-      thumbnail: video.thumbnail,
+    await fetch('/api/list/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: video.title,
+        videoId: video.videoId,
+        thumbnail: video.thumbnail,
+        channelTitle: video.channelTitle,
+        chunks: [], // 手動追加時は空
+        originalText: '',
+      }),
     });
   };
 
   const dbRemovePlaylist = async (videoId) => {
     if (!SB_READY) return;
-    await sbFrom("my_playlist").delete(`user_id=eq.${userId}&video_id=eq.${videoId}`);
+    await fetch(`/api/list/delete?videoId=${encodeURIComponent(videoId)}`, {
+      method: 'DELETE',
+    });
   };
 
   const dbSaveTestResult = async (type, correct, total, score = 0) => {
@@ -1506,12 +1533,74 @@ function EigoMasterInner() {
   }, [t$]);
 
   // 手動入力でリトライ
-  const submitManualTranscript = () => {
+  const makeManualCaptions = (chunks, videoId) => {
+    return chunks.map((c, i) => ({
+      id: `${videoId}_manual_${i}`,
+      english: c.en || '',
+      chunks: c.en ? c.en.split(' ').filter(Boolean).slice(0, 6) : [],
+      meaning: c.ja ? [c.ja] : ['(生成失敗)'],
+    }));
+  };
+
+  const fetchManualChunks = async (text) => {
+    const res = await fetch('/api/ai/chunk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (!res.ok || !Array.isArray(data.chunks)) {
+      throw new Error('chunk generation failed');
+    }
+    return data.chunks;
+  };
+
+  const submitManualTranscript = async () => {
     if (!manualText.trim() || !proc.videoId) return;
     const video = videos.find(v => v.videoId === proc.videoId);
-    if (video) {
+    if (!video) return;
+
+    setManualLoading(true);
+    setProc(p => ({ ...p, active: true, step: 'ai', pct: 10, needManual: false }));
+
+    try {
+      let chunks;
+      try {
+        chunks = await fetchManualChunks(manualText);
+      } catch (err) {
+        console.error('[manualChunk]', err);
+        chunks = [{ en: 'Hello everyone', ja: 'みなさんこんにちは' }];
+      }
+
+      const captions = makeManualCaptions(chunks, video.videoId);
+      setCaptionCache(prev => ({ ...prev, [video.videoId]: captions }));
+      setVideos(prev => prev.map(v => v.videoId === video.videoId ? { ...v, aiReady: true } : v));
+      dbSaveCaptions(video.videoId, captions).catch(() => {});
+
+      // マイリストに保存
+      try {
+        await fetch('/api/list/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: video.title,
+            videoId: video.videoId,
+            thumbnail: video.thumbnail,
+            channelTitle: video.channelTitle,
+            chunks,
+            originalText: manualText,
+          }),
+        });
+        console.log('[save] Saved to my list');
+      } catch (saveErr) {
+        console.error('[save]', saveErr);
+      }
+
+      setProc({ active: false, step: 'done', pct: 100, videoId: null, videoTitle: '', needManual: false });
       setManualText('');
-      processNewVideo(video, manualText);
+      t$('✨ AIでChunk生成しました');
+    } finally {
+      setManualLoading(false);
     }
   };
 
@@ -2021,6 +2110,13 @@ function EigoMasterInner() {
     setCurVid(v); setCapIdx(0); setShwPh("idle"); setScreen("video");
     // メモリキャッシュ済みなら終了
     if (captionCache[v.videoId]) return;
+    // マイリストのchunksがあればそれを使う
+    if (v.chunks && v.chunks.length > 0) {
+      const captions = makeManualCaptions(v.chunks, v.videoId);
+      setCaptionCache(prev => ({ ...prev, [v.videoId]: captions }));
+      setVideos(prev => prev.map(vid => vid.videoId === v.videoId ? { ...vid, aiReady: true } : vid));
+      return;
+    }
     // Supabaseから読み込み
     const fromDb = await dbLoadCaptions(v.videoId);
     if (fromDb && fromDb.length > 0) {
@@ -2064,27 +2160,37 @@ function EigoMasterInner() {
         <div className="empty"><div style={{fontSize:44,marginBottom:10}}>📭</div><div className="jp" style={{fontSize:14,fontWeight:600,color:"var(--t2)",marginBottom:4}}>まだ動画がありません</div><div className="jp" style={{fontSize:12}}>URLを入力して動画を追加しましょう</div></div>
       ):(
         <div className="vlist">
-          {dVids.map(v=>(
-            <button key={v.videoId} className="vcard" onClick={()=>goVideo(v)}>
-              <div className="vth">
-                <img src={v.thumbnail} alt={v.title} onError={e => { const img = e.currentTarget as HTMLImageElement; img.style.display = "none"; }} />
-                <div className="vtho">{I({n:"play",s:22,c:"white"})}</div>
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:600,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{v.title}</div>
-                <div style={{fontSize:11,color:"var(--t3)",marginBottom:6}}>{v.channelTitle}</div>
-                <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  {(captionCache[v.videoId]||DUMMY_CAPTIONS[v.videoId])
-                    ? <span style={{fontSize:10,fontWeight:600,padding:"2px 6px",borderRadius:4,background:"#D1FAE5",color:"#059669"}}>✨ AI字幕あり</span>
-                    : v.aiReady===false&&proc.videoId===v.videoId
-                      ? <span style={{fontSize:10,fontWeight:600,padding:"2px 6px",borderRadius:4,background:"var(--al)",color:"#B45309"}}>⚙️ 生成中...</span>
-                      : <span style={{fontSize:10,fontWeight:600,padding:"2px 6px",borderRadius:4,background:"var(--pl)",color:"var(--p)"}}>語順学習</span>
-                  }
-                  {myList.some(m=>m.videoId===v.videoId)&&<span style={{fontSize:10,color:"var(--a)",fontWeight:700}}>📌 MY</span>}
+          {dVids.map(v=>{
+            const thumbSrc = typeof v.thumbnail === 'string' && v.thumbnail.trim() ? v.thumbnail : DEFAULT_THUMBNAIL;
+            return (
+              <button key={v.videoId} className="vcard" onClick={()=>goVideo(v)} aria-label={v.title}>
+                <div className="vth">
+                  <img
+                    src={thumbSrc}
+                    alt=""
+                    onError={e => {
+                      const img = e.currentTarget as HTMLImageElement;
+                      if (img.src !== DEFAULT_THUMBNAIL) img.src = DEFAULT_THUMBNAIL;
+                    }}
+                  />
+                  <div className="vtho">{I({n:"play",s:22,c:"white"})}</div>
                 </div>
-              </div>
-            </button>
-          ))}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{v.title}</div>
+                  <div style={{fontSize:11,color:"var(--t3)",marginBottom:6}}>{v.channelTitle}</div>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    {(captionCache[v.videoId]||DUMMY_CAPTIONS[v.videoId])
+                      ? <span style={{fontSize:10,fontWeight:600,padding:"2px 6px",borderRadius:4,background:"#D1FAE5",color:"#059669"}}>✨ AI字幕あり</span>
+                      : v.aiReady===false&&proc.videoId===v.videoId
+                        ? <span style={{fontSize:10,fontWeight:600,padding:"2px 6px",borderRadius:4,background:"var(--al)",color:"#B45309"}}>⚙️ 生成中...</span>
+                        : <span style={{fontSize:10,fontWeight:600,padding:"2px 6px",borderRadius:4,background:"var(--pl)",color:"var(--p)"}}>語順学習</span>
+                    }
+                    {myList.some(m=>m.videoId===v.videoId)&&<span style={{fontSize:10,color:"var(--a)",fontWeight:700}}>📌 MY</span>}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
       <div className="divhr"/>
@@ -2518,8 +2624,9 @@ function EigoMasterInner() {
   // ── GACHA ───────────────────────────────────────────────────────
   const Gacha = () => {
     const canRead = prJpText.trim().length > 0;
-    return (
-      <div className="sa">
+    if (prMode === 'input') {
+      return (
+        <div className="sa">
         <div className="gcon">
         <div style={{marginBottom:20}}>
           <div className="gbc">
@@ -3556,133 +3663,6 @@ function EigoMasterInner() {
   const handleWsInput = (_val: string) => { /* 4択方式のため不使用 */ };
   const handleWsMiss  = (_id: string) => { /* 4択方式のため不使用 */ };
 
-  // ════════════════════════════════════════════════════════════════
-  // WORD SHOOTER HANDLERS v2
-  // ════════════════════════════════════════════════════════════════
-  const startWordShooter = async () => {
-    // /api/quiz/generate から問題を取得（失敗してもダミーで動く）
-    try {
-      const r = await fetch('/api/quiz/generate', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({quizType:'word', sourceType:'toeic', level:'level_600', count:12}),
-      });
-      if (r.ok) {
-        const d = await r.json();
-        if (Array.isArray(d.questions) && d.questions.length > 0) {
-          const wds = d.questions.map((q: any) => ({en: q.word ?? q.en ?? '', jp: q.meaning ?? q.jp ?? ''}))
-                       .filter((w: any) => w.en && w.jp);
-          setWsQuizWords(wds);
-        }
-      }
-    } catch { /* ダミーにフォールバック */ }
-
-    setWsScore(0);
-    setWsLives(wsMaxLives);
-    setWsInput('');
-    setWsCombo(0);
-    setWsCoins(0);
-    setWsHits([]);
-    setWsWrong(null);
-    setWsFlash(false);
-    setWsSkills({slow:1, hint:1, heal:1});
-    setWsSlowed(false);
-    setWsPhase('play');
-    setWsActive(true);
-    // words は wsSlowed が更新された後に buildShooterWords 内で参照するため
-    // useEffect で wsPhase === 'play' になったときにセットする
-  };
-
-  // wsPhase が play になったら words を生成
-  const wsWordsInitRef = React.useRef(false);
-  useEffect(() => {
-    if (wsPhase === 'play' && !wsWordsInitRef.current) {
-      wsWordsInitRef.current = true;
-      const words = buildShooterWords();
-      setWsWords(words);
-    }
-    if (wsPhase !== 'play') {
-      wsWordsInitRef.current = false;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wsPhase]);
-
-  const handleWsInput = (val: string) => {
-    setWsInput(val);
-    const norm = val.trim().toLowerCase();
-    if (norm.length < 1) return;
-
-    const matched = wsWords.find(w =>
-      w.en.toLowerCase() === norm ||
-      (norm.length >= 2 && w.en.toLowerCase() === norm)
-    );
-    if (!matched) return;
-
-    // ✅ 正解
-    setWsHits(h => [...h, matched.id]);
-    setWsWords(p => p.filter(w => w.id !== matched.id));
-    const gain = 10 + wsCombo * 2;
-    const coinGain = Math.ceil(gain / 10);
-    setWsScore(s => s + gain);
-    setWsCoins(c => c + coinGain);
-    setWsCombo(c => c + 1);
-    setWsInput('');
-    setTimeout(() => setWsHits(h => h.filter(id => id !== matched.id)), 400);
-    if (wsWords.length <= 1) {
-      setTimeout(() => { setWsPhase('result'); setWsActive(false); }, 700);
-    }
-  };
-
-  const handleWsMiss = (wordId: string) => {
-    const missed = wsWords.find(w => w.id === wordId);
-    setWsWords(p => p.filter(w => w.id !== wordId));
-    setWsCombo(0);
-    // ダメージ表示
-    if (missed) {
-      setWsWrong({id: wordId, en: missed.en, jp: missed.jp});
-      setTimeout(() => setWsWrong(null), 2200);
-    }
-    setWsFlash(true);
-    setTimeout(() => setWsFlash(false), 400);
-
-    setWsLives(l => {
-      const next = l - 1;
-      if (next <= 0) { setWsPhase('result'); setWsActive(false); return 0; }
-      return next;
-    });
-  };
-
-  // ── スキル使用 ────────────────────────────────────────────────
-  const useWsSkill = (skill: 'slow'|'hint'|'heal') => {
-    if (wsSkills[skill] <= 0) return;
-    setWsSkills(s => ({...s, [skill]: s[skill] - 1}));
-    if (skill === 'slow') {
-      setWsSlowed(true);
-      // 落下速度を遅くする: words を再生成
-      setWsWords(prev => prev.map(w => ({...w, duration: (w.duration || 8) * 1.8})));
-      setTimeout(() => setWsSlowed(false), 8000);
-      t$('🐢 スロー発動！8秒間ゆっくりになります');
-    } else if (skill === 'hint') {
-      t$('💡 ヒント: 先頭2文字が光ります');
-      // ヒントは表示側で hint フィールドを利用
-    } else if (skill === 'heal') {
-      setWsLives(l => Math.min(l + 1, wsMaxLives));
-      t$('💚 HP +1 回復！');
-    }
-  };
-
-  // ── コインでガチャ → スキル付与 ──────────────────────────────
-  const wsGachaSkill = () => {
-    if (wsCoins < 5) { t$('コインが足りません（5枚必要）'); return; }
-    setWsCoins(c => c - 5);
-    const skills: ('slow'|'hint'|'heal')[] = ['slow','hint','heal'];
-    const got = skills[Math.floor(Math.random() * skills.length)];
-    setWsSkills(s => ({...s, [got]: s[got] + 1}));
-    const names = {slow:'🐢 スロー', hint:'💡 ヒント', heal:'💚 HP回復'};
-    t$(`🎰 ${names[got]} スキルを獲得！`);
-    setPts(p => p + 3);
-  };
-
   // ── BBC記事リスト読み込み ────────────────────────────────── ──────────────────────────────────
   const loadBBCFeed = async (feed) => {
     setBbcFeed(feed);
@@ -4113,7 +4093,7 @@ function EigoMasterInner() {
   };
 
   return (
-    <>
+    <div>
       <style>{CSS}</style>
       <div className="app">
         {/* ── Header ── */}
@@ -4265,8 +4245,8 @@ function EigoMasterInner() {
                 <button className="bg" style={{flex:1}} onClick={()=>setProc(p=>({...p,active:false,needManual:false}))}>
                   キャンセル
                 </button>
-                <button className="bp" style={{flex:2}} disabled={!manualText.trim()} onClick={submitManualTranscript}>
-                  🤖 AIでChunk生成
+                <button className="bp" style={{flex:2}} disabled={!manualText.trim() || manualLoading} onClick={submitManualTranscript}>
+                  {manualLoading ? '生成中...' : '🤖 AIでChunk生成'}
                 </button>
               </div>
             </div>
@@ -4378,12 +4358,9 @@ function EigoMasterInner() {
           </div>
         )}
       </div>
-    </>
-  );
-}
-
-// TypeScript: window拡張の型
-declare global { interface Window { _emUid?: string; _emUserId?: string; } }
+    </div>
+    );
+  }
 
 export default function EigoMaster() {
   return (

@@ -2,6 +2,8 @@
 
 YouTube動画・BBCニュースで**英語を語順のまま理解する**学習アプリ。
 
+**⚠️ 重要：本アプリで提供される字幕・翻訳の正確性は保証されません。学習補助ツールとしてご利用ください。**
+
 ---
 
 ## 機能一覧
@@ -19,6 +21,15 @@ YouTube動画・BBCニュースで**英語を語順のまま理解する**学習
 
 ---
 
+## 📖 固定ページ
+
+- **`/about`** - アプリについて、使い方、注意事項
+- **`/privacy-policy`** - プライバシーポリシー
+- **`/terms`** - 利用規約
+- **`/contact`** - お問い合わせフォーム
+
+---
+
 ## ⚡ すぐに動かす（env未設定でも動く）
 
 ```bash
@@ -31,11 +42,12 @@ npm run dev          # http://localhost:3000
 **env未設定の場合：**
 - Supabase → localStorage で代替（リロードでもデータ保持）
 - AI → ダミーデータで動作
+- AdSense → 無効（client ID未設定）
 - アプリは絶対にクラッシュしない設計
 
 ---
 
-## 📋 VS Code 移行後のセットアップ手順
+## 📋 Vercel デプロイ前のセットアップ手順
 
 ### Step 1: 環境変数を設定
 
@@ -57,6 +69,9 @@ GROQ_API_KEY=gsk_...        # 推奨・最速・無料枠大
 COHERE_API_KEY=...          # 安価
 GEMINI_API_KEY=AIzaSy...    # 安定
 OPENAI_API_KEY=sk-proj-...  # 最終手段
+
+# ── Google AdSense（任意・Vercel審査後に設定）─────────────────
+NEXT_PUBLIC_ADSENSE_CLIENT=ca-pub-xxxxxxxxxxxxxxxx
 ```
 
 ### Step 2: Supabase DBをセットアップ
@@ -72,6 +87,81 @@ npm run dev
 npm run build        # ビルドエラーがないか確認
 npm run type-check   # TypeScript型チェック
 ```
+
+---
+
+## 📊 Google AdSense 設定（Google審査後）
+
+### 環境変数
+
+本アプリは `NEXT_PUBLIC_ADSENSE_CLIENT` 環境変数から AdSense クライアントID を読み込みます。
+
+```env
+# Google AdSense クライアントID
+# https://adsense.google.com → 設定 → アカウント情報 → クライアントID
+NEXT_PUBLIC_ADSENSE_CLIENT=ca-pub-xxxxxxxxxxxxxxxx
+```
+
+### ads.txt
+
+Google AdSense 審査通過後、以下のファイルが自動的に `/public/ads.txt` に配置されます：
+
+```
+google.com, pub-xxxxxxxxxxxxxxxx, DIRECT, f08c47fec0942fa0
+```
+
+**Vercel にデプロイすると、自動的に以下の URL でアクセス可能になります：**
+
+```
+https://yourdomain.com/ads.txt
+```
+
+### 広告実装
+
+現在は **Google AdSense Auto Ads** のみを実装しています。
+
+- ページ読み込み時に自動的に広告が挿入されます
+- 追加の広告枠コンポーネントは未実装（今後対応予定）
+
+### AdSense Auto Ads の有効化
+
+1. [AdSense ダッシュボード](https://adsense.google.com) を開く
+2. **広告** → **サマリー** → **広告ユニット**
+3. **自動広告** → **編集** → **ON**
+
+---
+
+## ⚠️ 重要な注意事項
+
+### AI字幕・翻訳について
+
+```
+⚠️  本アプリで提供される字幕・翻訳・文法説明は
+   AIによって自動生成されたものです。
+
+   正確性は保証されません。
+   学習補助ツールとしてのみご利用ください。
+
+   重要な翻訳には必ず専門家に確認してください。
+```
+
+### YouTube 動画について
+
+```
+📺 本アプリで使用される YouTube 動画・音声の著作権は
+   各権利者（コンテンツ作成者）に帰属します。
+
+   使用は学習目的のみとしており、
+   違法複製・配信・販売は厳禁です。
+
+   → 利用規約: /terms
+   → プライバシーポリシー: /privacy-policy
+```
+
+### 学習補助について
+
+- 本アプリは TOEIC・英検等の資格試験**合格を保証しません**
+- 学習支援ツール**としてのみ**ご活用ください
 
 ---
 

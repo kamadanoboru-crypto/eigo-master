@@ -1,8 +1,11 @@
 import type { AppProps } from 'next/app';
 import Head from 'next/head';
+import Script from 'next/script';
 import './globals.css';
 
 export default function App({ Component, pageProps }: AppProps) {
+  const adsenseClientId = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
+
   return (
     <>
       <Head>
@@ -17,6 +20,17 @@ export default function App({ Component, pageProps }: AppProps) {
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <title>英語マスター</title>
       </Head>
+
+      {/* Google AdSense Auto Ads */}
+      {adsenseClientId && (
+        <Script
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`}
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+      )}
+
       <Component {...pageProps} />
     </>
   );

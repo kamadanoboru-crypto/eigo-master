@@ -57,6 +57,8 @@ create table if not exists my_playlist (
   title         text,
   channel_title text,
   thumbnail     text,
+  chunks        jsonb,
+  original_text text,
   created_at    timestamptz default now(),
   unique(user_id, video_id)
 );
