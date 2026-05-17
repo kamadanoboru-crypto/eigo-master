@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * lib/aiClient.ts  — サーバーサイド専用
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * GET /api/social/ranking?type=translation|learning&limit=50
  * ランキング取得

@@ -69,24 +69,33 @@ function buildPrompt(
     level_800: 'TOEIC 800点（上級）',
   };
   const lvLabel = lvMap[level] ?? 'TOEIC 600点（中級）';
-  const sents = savedLines.slice(0, 15).map(l => l.english).filter(Boolean).join('\n');
+  // 必ず english フィールドのみを使用（日本語訳は使わない）
+  const sents = savedLines
+    .slice(0, 15)
+    .map(l => l.english)
+    .filter((s): s is string => typeof s === 'string' && s.trim().length > 4)
+    .join('\n');
 
   if (quizType === 'word') {
-    return `${sents ? `以下の英文から重要単語を${count}個選び` : `${lvLabel}のTOEIC頻出単語を${count}個選び`}4択の単語問題を生成してください。${sents ? `\n英文:\n${sents}` : ''}
+    return `${sents ? `以下の英文から重要な英単語を${count}個選び` : `${lvLabel}のTOEIC頻出英単語を${count}個選び`}、英語→日本語の4択問題を生成してください。
+問題文は必ず英語の単語にしてください。日本語を問題文にしないでください。${sents ? `\n英文:\n${sents}` : ''}
 JSON配列のみ返してください（他の文字は一切不要）:
-[{"word":"単語","meaning":"日本語の意味","pos":"品詞","options":["正解","誤答1","誤答2","誤答3"],"correct":"正解と同じ文字列"}]
-optionsは必ずランダム順にすること。`;
+[{"word":"英単語","meaning":"日本語の意味","pos":"品詞","options":["正解の日本語","誤答1","誤答2","誤答3"],"correct":"正解の日本語と同じ文字列"}]
+optionsは必ずランダム順にすること。wordフィールドは必ず英語にすること。`;
   }
   if (quizType === 'grammar') {
-    return `${sents ? `以下の英文を参考に${lvLabel}のPart5穴埋め問題を${count}問` : `${lvLabel}のTOEIC Part5穴埋め問題を${count}問`}生成してください。${sents ? `\n参考:\n${sents}` : ''}
+    return `${sents ? `以下の英文を参考に${lvLabel}のPart5英語穴埋め問題を${count}問` : `${lvLabel}のTOEIC Part5英語穴埋め問題を${count}問`}生成してください。
+問題文（sフィールド）は必ず英語の文にし、_____で空欄を示してください。選択肢も必ず英語にしてください。${sents ? `\n参考英文:\n${sents}` : ''}
 JSON配列のみ返してください:
-[{"s":"_____を使った穴埋め文","options":["正解","誤1","誤2","誤3"],"ans":"正解","exp":"解説（日本語）","cat":"カテゴリ","correct":"ansと同じ"}]`;
+[{"s":"English sentence with _____","options":["correct","wrong1","wrong2","wrong3"],"ans":"correct","exp":"解説（日本語可）","cat":"カテゴリ","correct":"ansと同じ"}]`;
   }
   if (quizType === 'listening') {
     const lines = sents.split('\n').filter(Boolean).slice(0, count);
-    return `${lines.length >= 3 ? `以下の英文について正しい日本語訳と誤答3つを生成してください。\n英文:\n${lines.join('\n')}` : `${lvLabel}の英語ビジネス表現を${count}文作り、それぞれの正しい日本語訳と誤答3つを生成してください`}
+    return `${lines.length >= 3
+      ? `以下の英文について、正しい日本語訳と誤答3つを生成してください。\n英文:\n${lines.join('\n')}`
+      : `${lvLabel}の英語ビジネス表現を${count}文作り、それぞれの正しい日本語訳と誤答3つを生成してください。enフィールドは必ず英語にすること。`}
 JSON配列のみ返してください:
-[{"en":"英文","jp":"正しい日本語訳","distractors":["誤1","誤2","誤3"]}]`;
+[{"en":"英文（必ず英語）","jp":"正しい日本語訳","distractors":["誤1","誤2","誤3"]}]`;
   }
   return `${lvLabel}の英語問題を${count}問生成してください。JSONのみ返してください。`;
 }

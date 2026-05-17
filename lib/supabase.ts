@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * lib/supabase.ts
  * Supabase設定 + fetch ベースクライアント

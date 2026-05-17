@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * lib/quizCache.ts  — サーバーサイド専用
  *

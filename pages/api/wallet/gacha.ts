@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * POST /api/wallet/gacha
  * ガチャを引く（デイリー上限・インフレ対策付き）

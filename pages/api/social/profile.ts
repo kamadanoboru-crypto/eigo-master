@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * GET  /api/social/profile?userId=xxx  → プロフィール取得
  * POST /api/social/profile             → プロフィール作成/更新

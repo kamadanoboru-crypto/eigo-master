@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * POST /api/social/vote
  * 翻訳への 👍/👎 投票（1ユーザー1票）

@@ -298,3 +298,41 @@ create policy "own_w" on user_translations for insert using (true) with check (t
 create policy "own_u" on user_translations for update using (true) with check (true);
 create policy "own"   on translation_votes for all using (true) with check (true);
 create policy "own_w" on affiliate_clicks  for insert using (true) with check (true);
+
+-- ================================================================
+-- v7追加: フリートーク掲示板（Talk）
+-- ================================================================
+create table if not exists talk_posts (
+  id         uuid default gen_random_uuid() primary key,
+  user_id    text not null,
+  nickname   text not null default '匿名',
+  avatar_emoji text default '🎓',
+  body       text not null,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_talk_posts_created on talk_posts(created_at desc);
+
+alter table talk_posts enable row level security;
+create policy "pub_r"  on talk_posts for select using (true);
+create policy "own_w"  on talk_posts for insert with check (true);
+
+-- ================================================================
+-- v8追加: 字幕生セグメントキャッシュ (transcript_cache)
+-- 用途: 同じ動画の字幕を毎回YouTubeから取得しないための永続キャッシュ
+-- TTL: fetched_at から 7日間有効（アプリ側で判断）
+-- ================================================================
+create table if not exists transcript_cache (
+  video_id   text primary key,
+  segments   jsonb not null,          -- {start,duration,text}[]
+  sentences  jsonb not null,          -- string[] グループ化済み
+  seg_count  int  not null default 0,
+  fetched_at timestamptz default now()
+);
+
+create index if not exists idx_transcript_cache_fetched on transcript_cache(fetched_at);
+
+alter table transcript_cache enable row level security;
+create policy "tc_pub_r" on transcript_cache for select using (true);
+create policy "tc_pub_w" on transcript_cache for insert with check (true);
+create policy "tc_pub_u" on transcript_cache for update using (true);

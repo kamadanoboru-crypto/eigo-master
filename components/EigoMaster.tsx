@@ -418,6 +418,7 @@ const I = ({n,s=20,c="currentColor"}) => ({
   globe:  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
   extlnk: <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
   xmark:  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>,
+  refresh:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
 })[n] || null;
 
 
@@ -442,43 +443,106 @@ const fetchVideoInfo = async (videoId) => {
   } catch { return null; }
 };
 
-// ② YouTube字幕取得（CORS proxy経由）
+// ② YouTube字幕取得
+// 優先順: DBキャッシュ → サーバーサイドAPI(戦略A/B) → CORSプロキシ(戦略C)
+// ※ CORSプロキシ(allorigins/corsproxy)はサーバー側には一切置かない
 const fetchTranscript = async (videoId) => {
-  const langs = ['en', 'en-US', 'en-GB', 'a.en'];
-  for (const lang of langs) {
+  // ── DBキャッシュ確認 ─────────────────────────────────────
+  if (SB_READY) {
     try {
-      const ytUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}`;
-      const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(ytUrl)}`);
-      if (!r.ok) continue;
-      const data = await r.json();
-      if (!data.contents || !data.contents.includes('<text')) continue;
-      const doc = new DOMParser().parseFromString(data.contents, 'text/xml');
-      const nodes = Array.from(doc.querySelectorAll('text'));
-      if (!nodes.length) continue;
-      // 単語グループ化 → 文に変換
-      const sentences = [];
-      let buf = '', wc = 0;
-      nodes.forEach(n => {
-        const w = n.textContent
-          .replace(/&amp;/g, '&').replace(/&#39;/g, "'")
-          .replace(/\n/g, ' ').trim();
-
-        if (!w) return;
-        buf += (buf ? ' ' : '') + w;
-        wc += w.split(' ').length;
-        if (wc >= 12 || /[.!?]$/.test(w)) {
-          const s = buf.trim();
-          if (s.split(' ').length >= 4) sentences.push(s);
-          buf = ''; wc = 0;
-        }
+      const cr = await fetch(`/api/transcript/cache?videoId=${encodeURIComponent(videoId)}`, {
+        signal: AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined,
       });
-      if (buf.trim().split(' ').length >= 4) sentences.push(buf.trim());
-      if (sentences.length >= 3) {
-        return { ok: true, sentences: sentences.slice(0, 15) };
+      if (cr.ok) {
+        const cd = await cr.json();
+        if (cd.ok && cd.hit && Array.isArray(cd.sentences) && cd.sentences.length >= 2) {
+          console.debug(`[fetchTranscript] DBキャッシュヒット: ${cd.sentences.length}文`);
+          return { ok: true, sentences: cd.sentences, segments: cd.segments || [], fromCache: true };
+        }
       }
-    } catch {}
+    } catch { /* キャッシュ失敗は無視して続行 */ }
   }
-  return { ok: false };
+
+  // ── 戦略A+B: サーバーサイドAPI ───────────────────────────
+  try {
+    console.debug(`[fetchTranscript] 戦略A/B: /api/transcript?videoId=${videoId}`);
+    const r = await fetch(`/api/transcript?videoId=${encodeURIComponent(videoId)}`, {
+      signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined,
+    });
+    if (r.ok) {
+      const d = await r.json();
+      if (d.ok && Array.isArray(d.sentences) && d.sentences.length >= 2) {
+        console.debug(`[fetchTranscript] サーバーAPI成功: ${d.sentences.length}文 / ${d.count || '?'}セグメント / ${d.elapsed}ms`);
+        // DBキャッシュへ非同期保存（失敗しても継続）
+        if (SB_READY && d.segments?.length) {
+          fetch('/api/transcript/cache', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ videoId, segments: d.segments, sentences: d.sentences }),
+          }).catch(() => {});
+        }
+        return { ok: true, sentences: d.sentences, segments: d.segments || [] };
+      }
+      if (!d.ok) {
+        console.debug(`[fetchTranscript] サーバーAPI: 字幕なし (${d.reason})`);
+        return { ok: false, reason: d.reason || '字幕が見つかりませんでした' };
+      }
+    }
+  } catch (e) {
+    console.warn('[fetchTranscript] サーバーAPI失敗:', e.message, '→ 戦略Cへ');
+  }
+
+  // ── 戦略C: CORSプロキシ（サーバーAPI停止時の最終保険）────
+  // ※ 不安定な外部サービスへの依存は最小限に
+  const PROXIES = [
+    (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  ];
+  const langs = ['en', 'a.en', 'en-US', 'en-GB'];
+
+  for (const proxy of PROXIES) {
+    for (const lang of langs) {
+      try {
+        const ytUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}&fmt=xml`;
+        const signal = AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined;
+        const r = await fetch(proxy(ytUrl), { signal });
+        if (!r.ok) continue;
+        const ct = r.headers.get('content-type') || '';
+        let xml = '';
+        if (ct.includes('application/json')) {
+          const d = await r.json();
+          xml = d.contents || '';
+        } else {
+          xml = await r.text();
+        }
+        if (!xml.includes('<text')) continue;
+        const sentences = [];
+        let buf = '', wc = 0;
+        const re = /<text[^>]*>([\s\S]*?)<\/text>/g;
+        let m;
+        while ((m = re.exec(xml)) !== null) {
+          const w = m[1].replace(/<[^>]+>/g,'')
+            .replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"')
+            .replace(/\n/g,' ').trim();
+          if (!w) continue;
+          buf += (buf ? ' ' : '') + w;
+          wc  += w.split(/\s+/).length;
+          if (wc >= 12 || /[.!?]$/.test(w)) {
+            if (buf.split(/\s+/).length >= 4) sentences.push(buf.trim());
+            buf = ''; wc = 0;
+          }
+        }
+        if (buf.split(/\s+/).length >= 4) sentences.push(buf.trim());
+        if (sentences.length >= 2) {
+          console.debug(`[fetchTranscript] 戦略C成功: lang=${lang}, ${sentences.length}文`);
+          return { ok: true, sentences: sentences.slice(0, 20), segments: [] };
+        }
+      } catch { /* 次のプロキシ/言語へ */ }
+    }
+  }
+
+  console.debug('[fetchTranscript] 全戦略失敗');
+  return { ok: false, reason: '字幕の自動取得に失敗しました。手動で字幕テキストを貼り付けてください。' };
 };
 
 // ③ Anthropic API: チャンク生成（AI差し替えポイント - モデル・プロンプト変更可）
@@ -833,8 +897,67 @@ body{font-family:'DM Sans','Noto Sans JP',sans-serif;background:var(--bg);color:
 /* ─ misc ─ */
 .empty{text-align:center;padding:56px 20px;color:var(--t3)}
 .divhr{height:8px;background:var(--bg)}
-.toast{position:fixed;top:66px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.9);color:#fff;padding:9px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:300;animation:fio 2.5s ease forwards;white-space:nowrap;font-family:'Noto Sans JP',sans-serif}
-@keyframes fio{0%{opacity:0;transform:translateX(-50%) translateY(-8px)}15%{opacity:1;transform:translateX(-50%) translateY(0)}75%{opacity:1}100%{opacity:0}}
+/* Toast: type別 */
+.toast{position:fixed;top:66px;left:50%;transform:translateX(-50%);padding:10px 18px 10px 14px;border-radius:20px;font-size:13px;font-weight:600;z-index:300;animation:fio 2.8s ease forwards;white-space:nowrap;font-family:'Noto Sans JP',sans-serif;display:flex;align-items:center;gap:7px;box-shadow:0 4px 12px rgba(0,0,0,.18);max-width:calc(100vw - 40px)}
+.toast-info{background:rgba(15,23,42,.88);color:#fff}
+.toast-ok{background:rgba(5,150,105,.93);color:#fff}
+.toast-ng{background:rgba(220,38,38,.93);color:#fff}
+.toast-warn{background:rgba(217,119,6,.93);color:#fff}
+@keyframes fio{0%{opacity:0;transform:translateX(-50%) translateY(-10px)}12%{opacity:1;transform:translateX(-50%) translateY(0)}78%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-4px)}}
+/* ボタンtap改善 */
+.bp:hover:not(:disabled){background:var(--pd)}
+.bg:active{background:var(--bg);transform:scale(.97)}
+/* ナビタップ強調 */
+.ni:active{background:var(--pl);border-radius:8px}
+/* カードtap */
+.vcard:hover{box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.lcard:hover{box-shadow:0 4px 12px rgba(0,0,0,.1)}
+/* スケルトン共通 */
+.skel{background:linear-gradient(90deg,var(--bd) 25%,var(--bg) 50%,var(--bd) 75%);background-size:200% 100%;animation:skel 1.4s ease-in-out infinite;border-radius:var(--rs)}
+@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* プロセスバー */
+.proc-bar{height:3px;background:var(--bd);overflow:hidden;flex-shrink:0}
+.proc-bar-inner{height:100%;background:linear-gradient(90deg,var(--p),#60A5FA);transition:width .4s ease;border-radius:2px}
+/* 学習導線バナー */
+.next-action{margin:0 16px 12px;padding:13px 16px;border-radius:var(--r);background:linear-gradient(135deg,var(--p),#3B82F6);display:flex;align-items:center;gap:12px;cursor:pointer;border:none;width:calc(100% - 32px);text-align:left}
+.next-action:active{transform:scale(.98)}
+/* 英語基地感: ヘッダーストリーク */
+.streak-badge{display:flex;align-items:center;gap:4px;padding:3px 9px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-radius:20px;font-size:11px;font-weight:700;color:#92400E;border:1px solid #FCD34D}
+/* 戦略表示 */
+.strategy-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.sc-a{background:#D1FAE5;color:#065F46}
+.sc-b{background:var(--al);color:#92400E}
+.sc-c{background:#FEE2E2;color:#991B1B}
+.sc-cache{background:#EDE9FE;color:#5B21B6}
+
+/* ─ onboarding ─ */
+.onb-card{margin:12px 16px;background:linear-gradient(135deg,#1D4ED8,#3B82F6,#60A5FA);border-radius:var(--r);padding:18px;color:#fff;position:relative;overflow:hidden}
+.onb-card::after{content:'🎓';position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:52px;opacity:.15}
+.onb-step{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.15)}
+.onb-step:last-child{border:none}
+.onb-num{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+/* ─ ガチャ演出強化 ─ */
+.gball-spin{animation:gball 0.6s ease-in-out}
+@keyframes gball{0%{transform:rotate(0deg) scale(1)}50%{transform:rotate(180deg) scale(1.15)}100%{transform:rotate(360deg) scale(1)}}
+.gres-pop{animation:gpop 0.5s cubic-bezier(.34,1.56,.64,1)}
+@keyframes gpop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
+/* ─ 単語保存演出 ─ */
+@keyframes saved-pulse{0%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}70%{box-shadow:0 0 0 10px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+.saved-flash{animation:saved-pulse .5s ease}
+/* ─ モバイル: safe-area強化 ─ */
+.app{padding-bottom:env(safe-area-inset-bottom,0)}
+.bnav{height:calc(56px + env(safe-area-inset-bottom,0));padding-bottom:env(safe-area-inset-bottom,0);align-items:flex-start;padding-top:6px}
+.ni{padding:4px 2px 5px}
+/* ─ キーボード表示崩れ対策 ─ */
+@media (max-height:500px){.bnav{display:none}.sa{height:100vh}}
+/* ─ modal: タップで閉じやすく ─ */
+.msh{padding-bottom:max(40px,env(safe-area-inset-bottom,40px))}
+/* ─ ストリーク数字アニメ ─ */
+.streak-num{display:inline-block;animation:snum .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes snum{0%{transform:scale(0.5);opacity:0}100%{transform:scale(1);opacity:1}}
+/* ─ PWA install バナー ─ */
+.install-banner{margin:8px 16px;padding:12px 14px;background:linear-gradient(135deg,#1E293B,#334155);border-radius:var(--r);display:flex;align-items:center;gap:12px;animation:slideIn .3s ease}
+@keyframes slideIn{from{transform:translateY(-8px);opacity:0}to{transform:translateY(0);opacity:1}}
 
 /* ─ news hub ─ */
 .nhub{padding:16px;display:flex;flex-direction:column;gap:14px}
@@ -1127,11 +1250,12 @@ function EigoMasterInner() {
   const [captionCache, setCaptionCache] = useState({}); // videoId → captions[]
   const [proc, setProc] = useState({
     active: false,      // 処理中か
-    step: '',           // 'info'|'transcript'|'ai'|'manual'|'saving'|'done'
+    step: '',           // 'info'|'transcript'|'ai'|'manual'|'saving'|'done'|'error'
     pct: 0,             // 進捗 0-100
     videoId: null,      // 処理中のvideoId
     videoTitle: '',     // 処理中の動画タイトル（表示用）
     needManual: false,  // 手動入力が必要か
+    errorMsg: '',       // エラー詳細メッセージ
   });
   const [manualText, setManualText] = useState('');
   const [manualLoading, setManualLoading] = useState(false);
@@ -1157,10 +1281,30 @@ function EigoMasterInner() {
   const [tPh,  setTPh]  = useState("quiz"); // quiz|result
   const [lisN, setLisN] = useState(0);
   const [play, setPlay] = useState(false);
-  // toast
-  const [toast,setToast]= useState(null);
+  // onboarding: 初回のみ表示
+  const [showOnb, setShowOnb] = useState(() => {
+    try { return !localStorage.getItem('em_onb_done'); } catch { return true; }
+  });
+  const dismissOnb = () => {
+    setShowOnb(false);
+    try { localStorage.setItem('em_onb_done','1'); } catch {}
+  };
+  // PWA install prompt (Android Chrome)
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstall, setShowInstall] = useState(false);
+  useEffect(() => {
+    const h = (e: any) => { e.preventDefault(); setDeferredPrompt(e); setShowInstall(true); };
+    window.addEventListener('beforeinstallprompt', h);
+    return () => window.removeEventListener('beforeinstallprompt', h);
+  }, []);
+  // toast: { msg, type:'ok'|'ng'|'warn'|'info' }
+  const [toast,setToast]= useState<{msg:string;type:string}|null>(null);
   const tmr = useRef(null);
-  const t$ = useCallback(m=>{setToast(m);if(tmr.current)clearTimeout(tmr.current);tmr.current=setTimeout(()=>setToast(null),2500);},[]);
+  const t$ = useCallback((m:string, type:'ok'|'ng'|'warn'|'info'='info')=>{
+    setToast({msg:m,type});
+    if(tmr.current)clearTimeout(tmr.current);
+    tmr.current=setTimeout(()=>setToast(null),2800);
+  },[]);
 
   // ── Supabase: ユーザーID ────────────────────────────────────
   // user_id: ログイン済みは auth.uid, 未ログインはlocalStorage UUID
@@ -1245,6 +1389,36 @@ function EigoMasterInner() {
     };
     initAuth();
   }, []);
+
+  // ── ウォレット初期化: ログイン時に残高取得 & 初回100コイン付与 ──
+  useEffect(() => {
+    if (!SB_READY) return;
+    const uid = authUser?.id || userId;
+    const initWallet = async () => {
+      try {
+        const r = await fetch(`/api/wallet?userId=${encodeURIComponent(uid)}`);
+        if (!r.ok) return;
+        const w = await r.json();
+        setWallet(w);
+        console.log('[wallet] 残高取得:', w.coins, 'coins');
+        // 初回ログイン: コインが0なら100コイン付与
+        if ((w.coins ?? 0) === 0) {
+          const r2 = await fetch('/api/wallet', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({userId: uid, action:'add', amount:100, decay:false}),
+          });
+          if (r2.ok) {
+            const d = await r2.json();
+            setWallet(prev => ({...prev, coins: d.total ?? 100}));
+            console.log('[wallet] 初回ボーナス付与: +100コイン');
+          }
+        }
+      } catch (e) { console.error('[wallet] 初期化エラー:', e); }
+    };
+    initWallet();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser?.id]);
 
   // プロフィール初回ロード
   useEffect(() => {
@@ -1477,58 +1651,103 @@ function EigoMasterInner() {
     const { videoId, title } = video;
     const upd = (step, pct, extra = {}) =>
       setProc(p => ({ ...p, active: true, step, pct, videoId, videoTitle: title, ...extra }));
+    const fail = (reason = '') => {
+      console.error('[processNewVideo] 失敗:', reason);
+      setProc({ active: false, step: 'error', pct: 0, videoId: null, videoTitle: '', needManual: false, errorMsg: reason });
+      t$((reason || '字幕生成に失敗しました'),'ng');
+    };
 
     try {
       // STEP 0: DBに既存データがあればスキップ（再追加対策）
       if (!manualTranscript) {
-        const existing = await dbLoadCaptions(videoId);
+        let existing = null;
+        try { existing = await dbLoadCaptions(videoId); } catch {}
         if (existing && existing.length > 0) {
           setCaptionCache(prev => ({ ...prev, [videoId]: existing }));
           setVideos(prev => prev.map(v => v.videoId === videoId ? { ...v, aiReady: true } : v));
           setProc({ active: false, step: 'done', pct: 100, videoId: null, videoTitle: '', needManual: false });
-          t$('✅ DB済み字幕を読み込みました');
-          return; // AI生成スキップ
+          t$('DB済み字幕を読み込みました','ok');
+          return;
         }
       }
 
       // STEP 1: 字幕取得
       upd('transcript', 10);
       let sentences = manualTranscript
-        ? manualTranscript.split(/[\n。.!?]+/).map(s => s.trim()).filter(s => s.split(' ').length >= 4).slice(0, 15)
+        ? manualTranscript.split(/[\n。.!?]+/).map(s => s.trim()).filter(s => s.split(/\s+/).length >= 4).slice(0, 20)
         : null;
 
       if (!sentences) {
-        const res = await fetchTranscript(videoId);
-        if (res.ok) {
+        let res;
+        try {
+          res = await fetchTranscript(videoId);
+        } catch (e) {
+          res = { ok: false, reason: '通信エラー: ' + (e.message || '') };
+        }
+
+        if (res.ok && res.sentences?.length > 0) {
           sentences = res.sentences;
+          console.log(`[processNewVideo] 字幕取得成功: ${sentences.length}文`);
+          upd('transcript', 18);
         } else {
-          // 自動取得失敗 → ユーザーに手動入力を求める
-          setProc(p => ({ ...p, active: true, step: 'manual', pct: 0, videoId, videoTitle: title, needManual: true }));
+          // 自動取得失敗 → 手動入力モーダルへ
+          const reason = res.reason || '字幕が見つかりませんでした';
+          console.log('[processNewVideo] 字幕取得失敗 → 手動入力モードへ:', reason);
+          setProc(p => ({
+            ...p,
+            active: true,
+            step: 'manual',
+            pct: 0,
+            videoId,
+            videoTitle: title,
+            needManual: true,
+            errorMsg: reason,
+          }));
           return; // 手動入力待ち
         }
       }
 
+      if (!sentences || sentences.length === 0) {
+        fail('字幕テキストが空です');
+        return;
+      }
+
       // STEP 2: AI Chunk生成
       upd('ai', 20, { needManual: false });
-      const rawCaptions = await aiGenerateChunks(sentences, pct => upd('ai', 20 + pct * 0.65));
+      let rawCaptions = [];
+      try {
+        rawCaptions = await aiGenerateChunks(sentences, pct => upd('ai', 20 + Math.round(pct * 0.65)));
+      } catch (e) {
+        console.error('[processNewVideo] AI Chunk失敗:', e.message);
+        // フォールバック: 文をそのまま使う
+        rawCaptions = sentences.map(s => ({
+          english: s,
+          chunks: s.split(/\s+/).slice(0, 6),
+          meaning: ['(AI未接続)'],
+        }));
+      }
+
+      if (rawCaptions.length === 0) {
+        fail('AI処理に失敗しました');
+        return;
+      }
 
       // IDを付与
       const captions = rawCaptions.map((c, i) => ({ ...c, id: `${videoId}_${i}` }));
 
       // STEP 3: Supabase保存
       upd('saving', 88);
-      await dbSaveCaptions(videoId, captions);
+      try { await dbSaveCaptions(videoId, captions); } catch (e) { console.warn('[processNewVideo] DB保存失敗:', e.message); }
 
       // STEP 4: キャッシュ更新 & 完了
       setCaptionCache(prev => ({ ...prev, [videoId]: captions }));
       setVideos(prev => prev.map(v => v.videoId === videoId ? { ...v, aiReady: true } : v));
-      setProc({ active: false, step: 'done', pct: 100, videoId: null, videoTitle: '', needManual: false });
-      t$('✨ AI字幕生成完了！');
+      setProc({ active: false, step: 'done', pct: 100, videoId: null, videoTitle: '', needManual: false, errorMsg: '' });
+      t$(`✨ AI字幕生成完了！（${captions.length}文）`);
 
     } catch (e) {
-      console.error('processNewVideo error:', e);
-      setProc({ active: false, step: 'error', pct: 0, videoId: null, videoTitle: '', needManual: false });
-      t$('❌ 字幕生成に失敗しました');
+      console.error('[processNewVideo] 予期しないエラー:', e);
+      fail((e as Error)?.message || '予期しないエラーが発生しました');
     }
   }, [t$]);
 
@@ -1596,7 +1815,7 @@ function EigoMasterInner() {
         console.error('[save]', saveErr);
       }
 
-      setProc({ active: false, step: 'done', pct: 100, videoId: null, videoTitle: '', needManual: false });
+      setProc({ active: false, step: 'done', pct: 100, videoId: null, videoTitle: '', needManual: false, errorMsg: '' });
       setManualText('');
       t$('✨ AIでChunk生成しました');
     } finally {
@@ -1617,7 +1836,30 @@ function EigoMasterInner() {
   const afCard = AFF[afLv];
   const dVids  = homeTab==="my"?myList:homeTab==="review"?videos.filter(v=>saved.some(s=>s.videoTitle===v.title)):videos;
 
-  // ── test helpers ──
+  // ── 学習ストリーク計算（TR から） ──────────────────────────
+  const streakStats = (() => {
+    const allLogs = [
+      ...TR.word, ...TR.grammar, ...TR.listening, ...TR.shadowing,
+    ].map(r => (r.date || '').slice(0,10)).filter(Boolean);
+    const today = new Date().toISOString().slice(0,10);
+    const todayCount = allLogs.filter(d => d === today).length;
+    // 連続日数
+    const days = Array.from(new Set(allLogs)).sort().reverse();
+    let streak = 0;
+    let cur = new Date(); cur.setHours(0,0,0,0);
+    for (const d of days) {
+      const dd = new Date(d); dd.setHours(0,0,0,0);
+      const diff = Math.round((cur.getTime() - dd.getTime()) / 86400000);
+      if (diff <= 1) { streak++; cur = dd; }
+      else break;
+    }
+    const todayWords = saved.filter(s => {
+      if (!s.savedAt) return false;
+      const d = new Date(s.savedAt);
+      return d.toISOString().slice(0,10) === today;
+    }).length;
+    return { todayCount, streak, todayWords };
+  })();
   const startTest = async (type: string) => {
     // 無料枠・コスト確認（quiz_ticket があれば優先）
     // Supabase未接続時は常に無料で動作
@@ -1886,7 +2128,7 @@ function EigoMasterInner() {
         body: JSON.stringify({ userId, videoId, captionIndex, english, translation }),
       });
       if (r.ok) {
-        t$('✅ 翻訳を投稿しました！ +5コイン');
+        t$('翻訳を投稿しました！ +5コイン','ok');
         setWallet(w => ({ ...w, coins: w.coins + 5 }));
       } else t$('投稿に失敗しました');
     } catch { t$('オフラインのため投稿できません'); }
@@ -1941,7 +2183,7 @@ function EigoMasterInner() {
       if (r.ok) {
         const d = await r.json();
         setWallet(w => ({ ...w, coins: d.total }));
-        if (d.limitReached) t$('⚠️ 本日のコイン獲得上限に達しました');
+        if (d.limitReached) t$('本日のコイン獲得上限に達しました','warn');
         return d;
       }
     } catch { /* ignore */ }
@@ -2081,9 +2323,9 @@ function EigoMasterInner() {
   const addUrl = async () => {
     if (!urlIn.trim()) return;
     const m = urlIn.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-    if (!m) { t$('❌ 有効なYouTube URLを入力してください'); return; }
+    if (!m) { t$('有効なYouTube URLを入力してください','ng'); return; }
     const id = m[1];
-    if (videos.some(v => v.videoId === id)) { t$('✅ 既存の動画です！'); setUrlIn(''); return; }
+    if (videos.some(v => v.videoId === id)) { t$('既存の動画です！','ok'); setUrlIn(''); return; }
     setUrlLd(true);
 
     // ① oEmbed でタイトル・チャンネル名を取得
@@ -2132,32 +2374,126 @@ function EigoMasterInner() {
   // ════════════════════════════════════════════════════════════════
 
   // ── HOME ────────────────────────────────────────────────────────
-  const Home = () => (
+  const Home = () => {
+    const hasAiReady = dVids.some(v => captionCache[v.videoId] || DUMMY_CAPTIONS[v.videoId]);
+    const hasSaved   = saved.length > 0;
+    return (
     <div className="sa">
       <div className="url-sec">
         <div className="url-row">
-          <input className="url-inp" placeholder="YouTube URLを入力" value={urlIn} onChange={e=>setUrlIn(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addUrl()}/>
-          <button className="bp" onClick={addUrl}>追加</button>
+          <input className="url-inp" placeholder="Paste YouTube URL..." value={urlIn} onChange={e=>setUrlIn(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addUrl()}/>
+          <button className="bp" onClick={addUrl}>Add</button>
         </div>
-        {urlLd&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"var(--pl)",borderRadius:"var(--rs)",marginTop:8}}><div className="spin"/><span className="jp" style={{fontSize:13,color:"var(--p)",fontWeight:500}}>動画を読み込み中…字幕を生成しています</span></div>}
+        {urlLd&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"var(--pl)",borderRadius:"var(--rs)",marginTop:8}}><div className="spin"/><span className="jp" style={{fontSize:13,color:"var(--p)",fontWeight:500}}>Loading video...</span></div>}
       </div>
       <div className="tabs">
-        {[["all","全体"],["my","マイリスト"],["review","復習"]].map(([k,v])=>(
+        {[["all","All Videos"],["my","My List"],["review","Review"]].map(([k,v])=>(
           <div key={k} className={`tab ${homeTab===k?"on":""}`} onClick={()=>setHomeTab(k)}>{v}</div>
         ))}
       </div>
-      {dbLoading&&SB_READY&&(
-        <div style={{padding:"20px 16px",display:"flex",flexDirection:"column",gap:10}}>
-          {[1,2,3].map(i=>(
-            <div key={i} style={{height:82,background:"var(--sur)",borderRadius:"var(--r)",boxShadow:"var(--sh)",animation:"pulse 1.5s ease-in-out infinite",opacity:.7}}>
-              <style>{`@keyframes pulse{0%,100%{opacity:.7}50%{opacity:.4}}`}</style>
+      {/* PWA install バナー（Android Chrome のみ） */}
+      {showInstall && (
+        <div className="install-banner">
+          <span style={{fontSize:28,flexShrink:0}}>📲</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#fff",marginBottom:2}}>ホーム画面に追加</div>
+            <div className="jp" style={{fontSize:11,color:"rgba(255,255,255,.7)"}}>オフラインでも使えるアプリとして追加</div>
+          </div>
+          <button style={{border:"none",background:"rgba(255,255,255,.2)",color:"#fff",borderRadius:"var(--rs)",padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}
+            onClick={async()=>{
+              deferredPrompt?.prompt();
+              const r = await deferredPrompt?.userChoice;
+              setShowInstall(false); setDeferredPrompt(null);
+            }}>追加</button>
+          <button style={{border:"none",background:"none",color:"rgba(255,255,255,.5)",cursor:"pointer",padding:4,flexShrink:0}}
+            onClick={()=>setShowInstall(false)}>{I({n:"close",s:16,c:"rgba(255,255,255,.5)"})}</button>
+        </div>
+      )}
+      {/* 初回オンボーディングカード */}
+      {showOnb && dVids.length === 0 && (
+        <div className="onb-card">
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            <div>
+              <div style={{fontSize:15,fontWeight:700,color:"#fff",marginBottom:2}}>Welcome to English Base! 🎓</div>
+              <div className="jp" style={{fontSize:12,color:"rgba(255,255,255,.8)"}}>まずはYouTube動画を追加してみよう</div>
+            </div>
+            <button style={{border:"none",background:"rgba(255,255,255,.15)",color:"#fff",borderRadius:"50%",width:24,height:24,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}
+              onClick={dismissOnb}>{I({n:"close",s:14,c:"#fff"})}</button>
+          </div>
+          {[
+            {n:1, icon:"🎬", text:"YouTube英語動画のURLを貼り付ける"},
+            {n:2, icon:"🤖", text:"AIが字幕を解析・翻訳する"},
+            {n:3, icon:"📖", text:"対訳で読みながら単語を保存"},
+            {n:4, icon:"📝", text:"TOEIC形式の問題で腕試し"},
+            {n:5, icon:"🎰", text:"ガチャでご褒美をゲット！"},
+          ].map(s=>(
+            <div key={s.n} className="onb-step">
+              <div className="onb-num">{s.n}</div>
+              <span style={{fontSize:16}}>{s.icon}</span>
+              <div className="jp" style={{fontSize:13,color:"rgba(255,255,255,.9)",fontWeight:500}}>{s.text}</div>
             </div>
           ))}
-          <div className="jp" style={{textAlign:"center",fontSize:12,color:"var(--t3)"}}>Supabaseからデータを読み込み中...</div>
+          <button className="bp" style={{width:"100%",marginTop:14,background:"rgba(255,255,255,.2)",color:"#fff",fontSize:13}}
+            onClick={dismissOnb}>
+            わかった！動画を追加する →
+          </button>
+        </div>
+      )}
+      {/* 今日の学習サマリー（1回以上学習時） */}
+      {(streakStats.todayCount > 0 || streakStats.todayWords > 0) && (
+        <div style={{margin:"12px 16px 0",padding:"10px 14px",background:"var(--sur)",borderRadius:"var(--r)",boxShadow:"var(--sh)",display:"flex",gap:16,alignItems:"center"}}>
+          {streakStats.streak > 0 && (
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:18,fontWeight:700,color:"#F59E0B"}}>🔥{streakStats.streak}</div>
+              <div className="jp" style={{fontSize:10,color:"var(--t3)"}}>連続日</div>
+            </div>
+          )}
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:18,fontWeight:700,color:"var(--p)"}}>{streakStats.todayCount}</div>
+            <div className="jp" style={{fontSize:10,color:"var(--t3)"}}>今日の学習</div>
+          </div>
+          {streakStats.todayWords > 0 && (
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:18,fontWeight:700,color:"#10B981"}}>{streakStats.todayWords}</div>
+              <div className="jp" style={{fontSize:10,color:"var(--t3)"}}>保存単語</div>
+            </div>
+          )}
+          <div style={{flex:1,textAlign:"right"}}>
+            <div className="jp" style={{fontSize:11,color:"var(--t3)"}}>
+              {streakStats.streak >= 7 ? "🏆 1週間継続！" :
+               streakStats.streak >= 3 ? "👏 いい調子！" :
+               "💪 今日も学習"}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 学習導線バナー */}
+      {hasAiReady && hasSaved && (
+        <button className="next-action" onClick={()=>setNavTab('learn')} style={{margin:"12px 16px 0",width:"calc(100% - 32px)"}}>
+          <span style={{fontSize:22,flexShrink:0}}>🎯</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#fff",marginBottom:1}}>Test your vocabulary</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.8)"}}>保存単語{saved.length}語 → 単語テスト or Part5</div>
+          </div>
+          <span style={{color:"rgba(255,255,255,.7)",fontSize:20}}>›</span>
+        </button>
+      )}
+      {dbLoading&&SB_READY&&(
+        <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
+          {[1,2,3].map(i=>(<div key={i} style={{height:82,borderRadius:"var(--r)"}} className="skel"/>))}
         </div>
       )}
       {!dbLoading&&dVids.length===0?(
-        <div className="empty"><div style={{fontSize:44,marginBottom:10}}>📭</div><div className="jp" style={{fontSize:14,fontWeight:600,color:"var(--t2)",marginBottom:4}}>まだ動画がありません</div><div className="jp" style={{fontSize:12}}>URLを入力して動画を追加しましょう</div></div>
+        <div className="empty">
+          <div style={{fontSize:48,marginBottom:12}}>🎬</div>
+          <div style={{fontSize:16,fontWeight:700,color:"var(--t)",marginBottom:6}}>Add a YouTube video</div>
+          <div className="jp" style={{fontSize:13,color:"var(--t2)",marginBottom:16,lineHeight:1.7}}>英語動画のURLを貼り付けると<br/>AI字幕・対訳・単語学習が始まります</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center"}}>
+            {["TED Talks","BBC News","English Lessons"].map(s=>(
+              <span key={s} style={{fontSize:11,padding:"4px 10px",background:"var(--pl)",color:"var(--p)",borderRadius:20,fontWeight:600}}>{s}</span>
+            ))}
+          </div>
+        </div>
       ):(
         <div className="vlist">
           {dVids.map(v=>{
@@ -2178,15 +2514,20 @@ function EigoMasterInner() {
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{v.title}</div>
                   <div style={{fontSize:11,color:"var(--t3)",marginBottom:6}}>{v.channelTitle}</div>
-                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
                     {(captionCache[v.videoId]||DUMMY_CAPTIONS[v.videoId])
-                      ? <span style={{fontSize:10,fontWeight:600,padding:"2px 6px",borderRadius:4,background:"#D1FAE5",color:"#059669"}}>✨ AI字幕あり</span>
-                      : v.aiReady===false&&proc.videoId===v.videoId
-                        ? <span style={{fontSize:10,fontWeight:600,padding:"2px 6px",borderRadius:4,background:"var(--al)",color:"#B45309"}}>⚙️ 生成中...</span>
-                        : <span style={{fontSize:10,fontWeight:600,padding:"2px 6px",borderRadius:4,background:"var(--pl)",color:"var(--p)"}}>語順学習</span>
+                      ? <span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:4,background:"#D1FAE5",color:"#059669"}}>✨ AI Ready</span>
+                      : proc.videoId===v.videoId&&proc.active
+                        ? <span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:4,background:"var(--al)",color:"#B45309"}}>⚙️ {proc.pct}%</span>
+                        : <span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:4,background:"var(--pl)",color:"var(--p)"}}>Tap to study</span>
                     }
-                    {myList.some(m=>m.videoId===v.videoId)&&<span style={{fontSize:10,color:"var(--a)",fontWeight:700}}>📌 MY</span>}
+                    {myList.some(m=>m.videoId===v.videoId)&&<span style={{fontSize:10,color:"var(--a)",fontWeight:700}}>📌</span>}
                   </div>
+                  {proc.videoId===v.videoId&&proc.active&&(
+                    <div style={{position:"absolute",bottom:0,left:0,right:0,height:3,background:"var(--bd)",borderRadius:"0 0 var(--r) var(--r)",overflow:"hidden"}}>
+                      <div style={{width:`${proc.pct}%`,height:"100%",background:"linear-gradient(90deg,var(--p),#60A5FA)",transition:"width .4s ease"}}/>
+                    </div>
+                  )}
                 </div>
               </button>
             );
@@ -2194,13 +2535,25 @@ function EigoMasterInner() {
         </div>
       )}
       <div className="divhr"/>
+      {/* ランガク外部導線 */}
+      <div style={{margin:"0 16px 8px",background:"linear-gradient(135deg,#FFF7ED,#FFEDD5)",borderRadius:"var(--r)",padding:"14px 16px",border:"1.5px solid #FDE68A"}}>
+        <div style={{fontSize:10,fontWeight:700,color:"#92400E",marginBottom:4,fontFamily:"'Noto Sans JP'",textTransform:"uppercase",letterSpacing:.5}}>📖 おすすめ</div>
+        <div style={{fontSize:15,fontWeight:700,color:"var(--t)",marginBottom:2}}>ランガク</div>
+        <div className="jp" style={{fontSize:12,color:"var(--t2)",marginBottom:10,lineHeight:1.6}}>集英社の英語学習マンガアプリ。マンガで楽しく英語が身につく！</div>
+        <a href="https://langaku.jp/" target="_blank" rel="noreferrer"
+          style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"8px 16px",background:"#F97316",color:"#fff",borderRadius:"var(--rs)",textDecoration:"none",fontWeight:700,fontSize:13,fontFamily:"'Noto Sans JP'"}}
+        >
+          ランガクを見る {I({n:"extlnk",s:14,c:"#fff"})}
+        </a>
+      </div>
       <div className="bad-w">
         <div className="bad-lbl">広告</div>
         <div className="bad"><div><div style={{fontSize:11.5,color:"#92400E",fontWeight:600,fontFamily:"'Noto Sans JP'"}}>🎓 TOEIC 900点への最短ルート</div><div style={{fontSize:10,color:"#92400E",opacity:.7}}>スキマ時間で効率学習</div></div><div style={{fontSize:10,color:"#78350F",background:"rgba(255,255,255,.6)",padding:"4px 10px",borderRadius:20,fontWeight:700}}>詳細 ▶</div></div>
       </div>
       <div style={{height:16}}/>
     </div>
-  );
+    );
+  };
 
   // ── LEARN HUB ───────────────────────────────────────────────────
   const LearnHub = () => {
@@ -2623,37 +2976,95 @@ function EigoMasterInner() {
 
   // ── GACHA ───────────────────────────────────────────────────────
   const Gacha = () => {
-    const canRead = prJpText.trim().length > 0;
+    return (
+      <div className="sa">
+        <div className="gcon">
+          {/* ガチャ球 */}
+          <div style={{marginBottom:20}}>
+            <div className={`gbc${gRes?' gball-spin':''}`}>
+              <div className="gbi">
+                {["#EF4444","#3B82F6","#10B981","#F59E0B","#8B5CF6","#EC4899","#06B6D4","#84CC16","#F97316","#6366F1","#14B8A6","#EAB308"].map((c,i)=>(
+                  <div key={i} className="gb" style={{background:`radial-gradient(circle at 30% 30%,${c}dd,${c}88)`}}/>
+                ))}
+              </div>
+            </div>
+            <div className="gbase"><div className="ghole"/></div>
+          </div>
+          {/* コイン表示 */}
+          <div style={{display:"flex",gap:10,flexWrap:"wrap",justifyContent:"center",marginBottom:4}}>
+            <div className="gpts">🪙<span>{wallet.coins} coins</span></div>
+            {wallet.gacha_tickets > 0 && <div className="gpts" style={{background:"#DBEAFE",color:"#1D4ED8"}}>🎰<span>チケット×{wallet.gacha_tickets}</span></div>}
+          </div>
+          <div className="jp" style={{fontSize:11,color:"var(--t3)",marginBottom:18}}>本日残り {dailyGachaLeft} 回</div>
+          {/* ガチャ結果 */}
+          {gRes&&<div className="gres gres-pop"><div style={{fontSize:44,marginBottom:6}}>{gRes.emoji}</div><div className="jp" style={{fontSize:15,fontWeight:700,color:"#78350F"}}>{gRes.text}</div>{gRes.pts>0&&<div style={{fontSize:13,color:"#92400E",marginTop:4}}>+{gRes.pts}pt ゲット！</div>}</div>}
+          {/* ガチャボタン */}
+          <div style={{display:"flex",gap:10,marginBottom:20}}>
+            <button className="bp" style={{flex:1,fontSize:13}} onClick={()=>doGacha('free')} disabled={dailyGachaLeft<=0}>
+              {dailyGachaLeft>0?`🎰 Free (${dailyGachaLeft}回残り)`:"🎰 明日また来てね"}
+            </button>
+            <button className="bp" style={{flex:1,fontSize:12,background:wallet.coins>=10?"#7C3AED":"var(--bd)",color:wallet.coins>=10?"#fff":"var(--t3)"}}
+              onClick={()=>doGacha('coin')} disabled={wallet.coins<10}>
+              {wallet.coins>=10?`🪙 10枚でガチャ`:`🪙 あと${10-wallet.coins}枚`}
+            </button>
+          </div>
+          {wallet.coins<10&&(
+            <div className="jp" style={{fontSize:12,color:"var(--t2)",textAlign:"center",marginBottom:16,padding:"8px 14px",background:"var(--al)",borderRadius:"var(--rs)"}}>
+              💡 学習するとコインが貯まります → <button style={{color:"var(--p)",background:"none",border:"none",fontWeight:700,cursor:"pointer",fontSize:12}} onClick={()=>setNavTab('learn')}>学習する →</button>
+            </div>
+          )}
+          {/* チケット残高 */}
+          {(wallet.quiz_tickets > 0 || wallet.video_tickets > 0) && (
+            <div style={{background:"var(--pl)",borderRadius:"var(--rs)",padding:"10px 14px",marginBottom:16}}>
+              <div className="jp" style={{fontSize:11,fontWeight:700,color:"var(--p)",marginBottom:6}}>🎟 所持チケット</div>
+              <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                {wallet.quiz_tickets > 0 && <span className="jp" style={{fontSize:12,color:"#6D28D9",background:"rgba(139,92,246,.12)",padding:"3px 10px",borderRadius:10}}>📝 クイズ×{wallet.quiz_tickets}</span>}
+                {wallet.video_tickets > 0 && <span className="jp" style={{fontSize:12,color:"#1D4ED8",background:"rgba(37,99,235,.12)",padding:"3px 10px",borderRadius:10}}>🎬 動画×{wallet.video_tickets}</span>}
+              </div>
+            </div>
+          )}
+          {/* 履歴 */}
+          {gHist.length > 0 && (
+            <div style={{background:"var(--sur)",borderRadius:"var(--r)",padding:"12px 14px",boxShadow:"var(--sh)"}}>
+              <div className="jp" style={{fontSize:12,fontWeight:700,color:"var(--t2)",marginBottom:8}}>📜 今日の履歴</div>
+              <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                {gHist.slice(0,5).map((h,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
+                    <span style={{fontSize:16}}>{h.emoji}</span>
+                    <span className="jp" style={{flex:1,color:"var(--t2)"}}>{h.text}</span>
+                    <span style={{fontSize:11,color:"var(--t3)"}}>{h.time}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{height:20}}/>
+      </div>
+    );
+  };
+
+  // ── PARALLEL READER ──────────────────────────────────────────────
+  const ParallelReader = () => {
+    const canRead = prEnText.trim().length > 0;
     if (prMode === 'input') {
       return (
         <div className="sa">
-        <div className="gcon">
-        <div style={{marginBottom:20}}>
-          <div className="gbc">
-            <div className="gbi">
-              {["#EF4444","#3B82F6","#10B981","#F59E0B","#8B5CF6","#EC4899","#06B6D4","#84CC16","#F97316","#6366F1","#14B8A6","#EAB308"].map((c,i)=>(
-                <div key={i} className="gb" style={{background:`radial-gradient(circle at 30% 30%,${c}dd,${c}88)`}}/>
-              ))}
+          <div className="pr-input-wrap">
+            <div>
+              <div className="pr-input-label">
+                <span style={{fontSize:14}}>🇺🇸</span>
+                <span>英文（必須）</span>
+                <span style={{fontSize:11,color:"var(--t3)",marginLeft:"auto"}}>BBC・記事などを貼り付け</span>
+              </div>
+              <textarea
+                className="pr-textarea"
+                rows={6}
+                placeholder={"英語の記事・本文を貼り付けてください。\n例: The meeting has been postponed..."}
+                value={prEnText}
+                onChange={e => setPrEnText(e.target.value)}
+              />
             </div>
-          </div>
-          <div className="gbase"><div className="ghole"/></div>
-        </div>
-        <div style={{display:"flex",gap:10,flexWrap:"wrap",justifyContent:"center",marginBottom:4}}>
-              <div className="gpts">🪙<span>{wallet.coins} coins</span></div>
-              {wallet.gacha_tickets > 0 && <div className="gpts" style={{background:"#DBEAFE",color:"#1D4ED8"}}>🎰<span>チケット×{wallet.gacha_tickets}</span></div>}
-            </div>
-            <div className="jp" style={{fontSize:11,color:"var(--t3)",marginBottom:18}}>本日残り {dailyGachaLeft} 回</div>
-        {gRes&&<div className="gres"><div style={{fontSize:44,marginBottom:6}}>{gRes.emoji}</div><div style={{fontSize:15,fontWeight:700,color:"#78350F",fontFamily:"'Noto Sans JP'"}}>{gRes.text}</div>{gRes.pts>0&&<div style={{fontSize:13,color:"#92400E",marginTop:4}}>+{gRes.pts}pt ゲット！</div>}</div>}
-        <div style={{display:"flex",gap:10,marginBottom:20}}>
-          <button className="bp" style={{flex:1,fontSize:13}} onClick={()=>doGacha('free')} disabled={dailyGachaLeft<=0}>
-                  🎰 {dailyGachaLeft>0?"無料ガチャ":"本日終了"}
-                </button>
-          <button className="bp" style={{flex:1,fontSize:12,background:"#7C3AED"}} onClick={()=>doGacha('coin')} disabled={wallet.coins<10}>
-                  🪙10枚でガチャ
-                </button>
-            </div>
-
-            {/* 日本語訳入力 */}
             <div>
               <div className="pr-input-label">
                 <span style={{fontSize:14}}>🇯🇵</span>
@@ -2663,13 +3074,11 @@ function EigoMasterInner() {
               <textarea
                 className="pr-textarea jp"
                 rows={5}
-                placeholder={"Google翻訳やDeepL等で翻訳した日本語を貼り付けてください。\n空欄でも英文のみで読めます。"}
+                placeholder={"Google翻訳やDeepLで翻訳した日本語を貼り付けてください。\n空欄でも英文のみで読めます。"}
                 value={prJpText}
                 onChange={e => setPrJpText(e.target.value)}
               />
             </div>
-
-            {/* ガイド */}
             <div style={{background:"var(--pl)",borderRadius:"var(--rs)",padding:"12px 14px"}}>
               <div style={{fontSize:12,fontWeight:700,color:"var(--p)",marginBottom:7}}>💡 使い方</div>
               {[
@@ -2680,8 +3089,6 @@ function EigoMasterInner() {
                 "⑤ 貯まった単語でシューティングゲーム！",
               ].map(s => <div key={s} className="jp" style={{fontSize:11,color:"var(--p)",lineHeight:1.8}}>{s}</div>)}
             </div>
-
-            {/* 読むボタン */}
             <button
               className="bp"
               style={{width:"100%",fontSize:15,padding:"13px"}}
@@ -2690,20 +3097,14 @@ function EigoMasterInner() {
             >
               {canRead ? "📖 対訳表示で読む →" : "英文を貼り付けてください"}
             </button>
-
-            {/* 保存済み単語 */}
             {prSaved.length > 0 && (
               <div style={{background:"var(--sur)",borderRadius:"var(--r)",padding:"14px 16px",boxShadow:"var(--sh)"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                  <div style={{fontSize:13,fontWeight:700,color:"var(--t2)",fontFamily:"'Noto Sans JP'"}}>
-                    ⭐ 保存済み（{prSaved.length}件）
-                  </div>
+                  <div className="jp" style={{fontSize:13,fontWeight:700,color:"var(--t2)"}}>⭐ 保存済み（{prSaved.length}件）</div>
                   <button
-                    style={{fontSize:12,fontWeight:700,color:"#fff",background:"#EF4444",border:"none",borderRadius:20,padding:"4px 10px",cursor:"pointer",fontFamily:"'Noto Sans JP'"}}
+                    style={{fontSize:12,fontWeight:700,color:"#fff",background:"#EF4444",border:"none",borderRadius:20,padding:"4px 10px",cursor:"pointer"}}
                     onClick={startWordShooter}
-                  >
-                    🎮 シューティング
-                  </button>
+                  >🎮 シューティング</button>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   {prSaved.slice(0,5).map(item => (
@@ -2732,14 +3133,11 @@ function EigoMasterInner() {
         </div>
       );
     }
-
-    // ── 読むモード ────────────────────────────────────────────────
+    // ── 読むモード ──────────────────────────────────────────────────
     const sentences = prSplitSentences(prEnText);
     const hasJp = prJpText.trim().length > 0;
-
     return (
       <div className="pr-wrap">
-        {/* ツールバー */}
         <div className="pr-toolbar">
           <button
             className={`pr-sync-btn ${prSyncScroll ? "pr-sync-on" : "pr-sync-off"}`}
@@ -2761,8 +3159,6 @@ function EigoMasterInner() {
             単語/文タップで保存
           </div>
         </div>
-
-        {/* 英文エリア */}
         <div
           className="pr-half pr-half-en"
           ref={el => { prEnRefEl.current = el; }}
@@ -2782,7 +3178,7 @@ function EigoMasterInner() {
                   key={si}
                   className={`pr-sent${isSel ? " sel" : ""}`}
                   onClick={e => {
-                    const target = e.target as HTMLElement | null;
+                    const target = e.target;
                     if (target?.classList?.contains('pr-word')) return;
                     handlePrSentTap(sent);
                   }}
@@ -2805,11 +3201,7 @@ function EigoMasterInner() {
             })}
           </div>
         </div>
-
-        {/* 区切り線 */}
         {hasJp && <div className="pr-divider"/>}
-
-        {/* 日本語エリア */}
         {hasJp && (
           <div
             className="pr-half pr-half-jp"
@@ -2823,13 +3215,11 @@ function EigoMasterInner() {
             <div className="pr-text pr-text-jp">{prJpText}</div>
           </div>
         )}
-
-        {/* 保存ポップアップ */}
         {prPopup && (prSelWord || prSelSent) && (
           <div className="pr-popup">
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
               <div>
-                <div style={{fontSize:12,fontWeight:700,color:"var(--t3)",marginBottom:3,fontFamily:"'Noto Sans JP'"}}>
+                <div className="jp" style={{fontSize:12,fontWeight:700,color:"var(--t3)",marginBottom:3}}>
                   {prSelWord ? "📌 単語を保存" : "📌 フレーズを保存"}
                 </div>
                 <div style={{fontSize:15,fontWeight:700,color:"var(--t)",maxWidth:260,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
@@ -3792,6 +4182,186 @@ function EigoMasterInner() {
     );
   };
 
+  // ── TALK (フリートーク掲示板) ─────────────────────────────────
+  const Talk = () => {
+    const [posts,    setPosts]    = React.useState<any[]>([]);
+    const [input,    setInput]    = React.useState('');
+    const [loading,  setLoading]  = React.useState(true);
+    const [posting,  setPosting]  = React.useState(false);
+    const [sbOk,     setSbOk]     = React.useState(false);  // Supabase使用中か
+    const maxLen = 200;
+    const displayName = myProfile?.nickname || (authUser?.name?.slice(0,12)) || '匿名';
+
+    // ── 投稿一覧ロード ───────────────────────────────────────
+    const loadPosts = React.useCallback(async () => {
+      setLoading(true);
+      try {
+        const r = await fetch('/api/social/talk?limit=30', { signal: AbortSignal.timeout(6000) });
+        const d = await r.json();
+        if (d.ok && Array.isArray(d.posts) && d.posts.length >= 0) {
+          setSbOk(true);
+          // Supabase形式 → 表示形式に変換
+          const converted = d.posts.map(p => ({
+            id:     p.id,
+            text:   p.body,
+            author: p.nickname || '匿名',
+            emoji:  p.avatar_emoji || '🎓',
+            time:   new Date(p.created_at).toLocaleString('ja-JP', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),
+          }));
+          setPosts(converted);
+          return;
+        }
+      } catch { /* fall through */ }
+      // Supabase失敗 → localStorage フォールバック
+      setSbOk(false);
+      try {
+        const s = localStorage.getItem('em_talk_posts');
+        setPosts(s ? JSON.parse(s) : []);
+      } catch { setPosts([]); }
+      setLoading(false);
+    }, []);
+
+    React.useEffect(() => { loadPosts().finally(() => setLoading(false)); }, [loadPosts]);
+
+    // ── 投稿送信 ─────────────────────────────────────────────
+    const handlePost = React.useCallback(async () => {
+      if (!input.trim() || input.length > maxLen || posting) return;
+      setPosting(true);
+      const optimistic = {
+        id:     Date.now()+'',
+        text:   input.trim(),
+        author: displayName,
+        emoji:  myProfile?.avatar_emoji || '🎓',
+        time:   new Date().toLocaleString('ja-JP', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}),
+      };
+      // 楽観的UI更新（即座に表示）
+      setPosts(prev => [optimistic, ...prev]);
+      setInput('');
+
+      if (sbOk) {
+        try {
+          const r = await fetch('/api/social/talk', {
+            method:  'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({
+              userId,
+              body:        optimistic.text,
+              nickname:    displayName,
+              avatarEmoji: myProfile?.avatar_emoji || '🎓',
+            }),
+            signal: AbortSignal.timeout(6000),
+          });
+          const d = await r.json();
+          if (d.ok && d.post) {
+            // IDをSupabase実IDで更新
+            setPosts(prev => prev.map(p => p.id === optimistic.id ? {...p, id: d.post.id} : p));
+            t$('投稿しました！', 'ok');
+          } else {
+            t$(d.reason || '投稿に失敗しました', 'ng');
+            setPosts(prev => prev.filter(p => p.id !== optimistic.id));
+          }
+        } catch {
+          t$('ネットワークエラー。後で再試行してください', 'ng');
+          setPosts(prev => prev.filter(p => p.id !== optimistic.id));
+        }
+      } else {
+        // localStorage保存（Supabase未設定時）
+        const updated = [optimistic, ...posts];
+        try { localStorage.setItem('em_talk_posts', JSON.stringify(updated.slice(0,50))); } catch {}
+        t$('投稿しました！', 'ok');
+      }
+      setPosting(false);
+    }, [input, posting, displayName, sbOk, posts, userId, myProfile]);
+
+    return (
+      <div className="sa">
+        <div style={{padding:"14px 16px 0"}}>
+          {/* ヘッダー */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            <div style={{fontSize:11,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:.5}}>
+              💬 Talk Board
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              {sbOk
+                ? <span style={{fontSize:10,color:"#059669",background:"#D1FAE5",padding:"2px 8px",borderRadius:10,fontWeight:600}}>🌐 Live</span>
+                : <span style={{fontSize:10,color:"var(--t3)",background:"var(--bd)",padding:"2px 8px",borderRadius:10}}>Local</span>
+              }
+              <button onClick={loadPosts} style={{border:"none",background:"none",cursor:"pointer",color:"var(--t3)",fontSize:13,padding:4}} title="更新">
+                {I({n:"refresh",s:16})}
+              </button>
+            </div>
+          </div>
+
+          {/* 投稿フォーム */}
+          <div style={{background:"var(--sur)",borderRadius:"var(--r)",padding:"14px",boxShadow:"var(--sh)",marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+              <div style={{width:32,height:32,borderRadius:"50%",background:"var(--pl)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
+                {myProfile?.avatar_emoji || '🎓'}
+              </div>
+              <div className="jp" style={{fontSize:13,fontWeight:600,color:"var(--t2)"}}>{displayName}</div>
+            </div>
+            <textarea
+              style={{width:"100%",padding:"10px 12px",border:"1.5px solid var(--bd)",borderRadius:"var(--rs)",fontSize:13,outline:"none",resize:"none",fontFamily:"'Noto Sans JP',sans-serif",background:"var(--bg)",color:"var(--t)",transition:"border-color .2s",lineHeight:1.6}}
+              rows={3}
+              placeholder={"Today I learned... / 今日覚えた英語:\n例: \"procrastinate\" = 先延ばしにする 🙈"}
+              value={input}
+              onChange={e => setInput(e.target.value.slice(0, maxLen))}
+              onFocus={e => { e.target.style.borderColor = 'var(--p)'; }}
+              onBlur={e => { e.target.style.borderColor = 'var(--bd)'; }}
+            />
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:8}}>
+              <span className="jp" style={{fontSize:11,color:input.length > maxLen*0.9 ? "var(--ng)" : "var(--t3)"}}>{input.length}/{maxLen}</span>
+              <button className="bp" style={{fontSize:13,padding:"8px 18px",opacity:posting?0.7:1}}
+                disabled={!input.trim() || posting} onClick={handlePost}>
+                {posting ? '⏳' : '投稿する'}
+              </button>
+            </div>
+          </div>
+
+          {/* 投稿一覧 */}
+          {loading ? (
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {[1,2,3].map(i => <div key={i} style={{height:80,borderRadius:"var(--r)"}} className="skel"/>)}
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="empty">
+              <div style={{fontSize:36,marginBottom:10}}>💬</div>
+              <div style={{fontSize:15,fontWeight:700,color:"var(--t)",marginBottom:6}}>Start the conversation</div>
+              <div className="jp" style={{fontSize:12,color:"var(--t2)",lineHeight:1.8,marginBottom:12}}>
+                今日覚えた英単語、学習の近況<br/>英語でも日本語でも気軽にどうぞ！
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center"}}>
+                {["Today I learned...","質問してみる","英語で挨拶"].map(s=>(
+                  <button key={s} onClick={()=>setInput(s)} style={{fontSize:11,padding:"5px 12px",background:"var(--pl)",color:"var(--p)",borderRadius:20,fontWeight:600,border:"none",cursor:"pointer"}}>{s}</button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {posts.map(post => (
+                <div key={post.id} style={{background:"var(--sur)",borderRadius:"var(--r)",padding:"12px 14px",boxShadow:"var(--sh)"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <div style={{width:28,height:28,borderRadius:"50%",background:"var(--pl)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>
+                      {post.emoji}
+                    </div>
+                    <div style={{flex:1}}>
+                      <span className="jp" style={{fontSize:13,fontWeight:600,color:"var(--t)"}}>{post.author}</span>
+                      <span style={{fontSize:11,color:"var(--t3)",marginLeft:8}}>{post.time}</span>
+                    </div>
+                  </div>
+                  <div className="jp" style={{fontSize:13,lineHeight:1.7,color:"var(--t)",whiteSpace:"pre-wrap"}}>{post.text}</div>
+                </div>
+              ))}
+              <div style={{height:8}}/>
+            </div>
+          )}
+          <div style={{height:20}}/>
+        </div>
+      </div>
+    );
+  };
+
+
   const RankingScreen = () => {
     const TABS = [
       {id:'learning' as const, label:'📚 学習'},
@@ -3887,7 +4457,7 @@ function EigoMasterInner() {
               if (!nickInput.trim()) return t$('ニックネームを入力してください');
               saveProfile(nickInput.trim(), selAvatar);
               setShowNickEdit(false);
-              t$('✅ ニックネームを保存しました');
+              t$('ニックネームを保存しました','ok');
             }}>保存</button>
           </div>
         </div>
@@ -4007,7 +4577,10 @@ function EigoMasterInner() {
         ))}
         <div className="stst" style={{marginTop:8}}>アプリ情報</div>
         {[
-          {label:"バージョン",val:"MVP 2.0.0"},
+          {label:"バージョン",val:"MVP 2.5.0"},
+          {label:"🔥 連続学習",val:`${streakStats.streak} 日`,c:"#F59E0B"},
+          {label:"📚 今日の学習",val:`${streakStats.todayCount} 回`,c:"var(--p)"},
+          {label:"📝 今日の単語",val:`${streakStats.todayWords} 語`,c:"#10B981"},
           {label:"保存文数",val:`${saved.length} 件`,c:"var(--p)"},
           {label:"マイリスト",val:`${myList.length} 本`,c:"var(--p)"},
           {label:"受験回数",val:`${TR.word.length+TR.grammar.length+TR.listening.length} 回`,c:"var(--pu)"},
@@ -4019,8 +4592,27 @@ function EigoMasterInner() {
             <div style={{fontSize:13,color:c||"var(--t3)",fontWeight:c?700:400}}>{val}</div>
           </div>
         ))}
+        {/* 保存済み単語帳リンク */}
+        <button className="lcard" style={{margin:"4px 0"}} onClick={()=>setNavTab("saved")}>
+          <div className="lcard-ico" style={{background:"#FFF7ED"}}>{I({n:"bkmk",s:22,c:"#F59E0B"})}</div>
+          <div style={{flex:1}}><div className="lcard-t">保存済み文・単語帳</div><div className="lcard-d">{saved.length}件 · 復習・シューティングに活用</div></div>
+          {I({n:"chR",s:18,c:"var(--t3)"})}
+        </button>
+        {/* DEBUG: コイン追加ボタン（開発用） */}
+        {process.env.NODE_ENV === 'development' && (
+          <div style={{background:"#FEF9C3",borderRadius:"var(--rs)",padding:"10px 14px",border:"1.5px dashed #FDE047"}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#713F12",marginBottom:6}}>🛠 DEBUG MODE</div>
+            <button
+              className="bp"
+              style={{width:"100%",fontSize:13,background:"#16A34A"}}
+              onClick={()=>{ setWallet(w=>({...w,coins:w.coins+100})); t$('+100コイン（DEBUG）','ok'); }}
+            >
+              🪙 +100コイン追加
+            </button>
+          </div>
+        )}
         <div style={{textAlign:"center",padding:"20px 0 8px"}}>
-          <div className="jp" style={{fontSize:12,color:"var(--t3)",lineHeight:1.9}}>英語マスター MVP 2.0<br/>🎓 語順のまま英語を理解する学習アプリ<br/><span style={{fontSize:11}}>テスト・分析・動画・ごほうびで継続できる</span></div>
+          <div className="jp" style={{fontSize:12,color:"var(--t3)",lineHeight:1.9}}>英語マスター MVP 2.1<br/>🎓 語順のまま英語を理解する学習アプリ<br/><span style={{fontSize:11}}>テスト・分析・動画・ごほうびで継続できる</span></div>
         </div>
       </div>
     </div>
@@ -4053,9 +4645,10 @@ function EigoMasterInner() {
       if(newsScreen==="bbcList")                return <BBCList/>;
       return <NewsHub/>;
     }
-    if(navTab==="saved")   return <Saved/>;
+    if(navTab==="talk")    return <Talk/>;
     if(navTab==="gacha")   return <Gacha/>;
     if(navTab==="settings")return <Settings/>;
+    if(navTab==="saved")   return <Saved/>;
     return <Home/>;
   };
 
@@ -4082,7 +4675,7 @@ function EigoMasterInner() {
     if(isAnal)  return <span className="jp" style={{fontSize:15}}>📊 成績分析</span>;
     if(wsActive) return <span className="jp" style={{fontSize:15}}>🎮 単語シューティング</span>;
     if(isNews&&newsScreen!=="hub") return newsTitle();
-    return <><span style={{fontSize:20}}>🎓</span><span className="jp">英語マスター</span></>;
+    return <><span style={{fontSize:20}}>🎓</span><span className="jp">English Base</span>{streakStats.streak>0&&<span className="streak-badge">🔥<span className="streak-num">{streakStats.streak}</span>日</span>}</>;
   };
   const showBack = isVideo||isTest||isAnal||wsActive||(isNews&&newsScreen!=="hub");
   const handleBack = () => {
@@ -4143,6 +4736,14 @@ function EigoMasterInner() {
                     ? <div title="Supabase接続中" style={{width:8,height:8,borderRadius:"50%",background:dbReady?"#10B981":"#F59E0B",flexShrink:0}}/>
                     : <div title="Supabase未設定（データはリセットされます）" style={{width:8,height:8,borderRadius:"50%",background:"#94A3B8",flexShrink:0}}/>
                   }
+                  {/* 設定ボタン */}
+                  <button
+                    style={{border:"none",background:"none",cursor:"pointer",color:"var(--t3)",padding:4,display:"flex",alignItems:"center"}}
+                    onClick={()=>setNavTab("settings")}
+                    title="設定"
+                  >
+                    {I({n:"cog",s:20})}
+                  </button>
                 </div>
               </>
             )}
@@ -4156,11 +4757,11 @@ function EigoMasterInner() {
         {!hideNav&&(
           <div className="bnav">
             {[
-              {id:"home",    n:"home",  lbl:"ホーム"},
-              {id:"learn",   n:"learn", lbl:"学習"},
-              {id:"news",    n:"news",  lbl:"ニュース"},
-              {id:"saved",   n:"bkmk",  lbl:`保存(${saved.length})`},
-              {id:"settings",n:"cog",   lbl:"設定"},
+              {id:"home",  n:"home",  lbl:"ホーム"},
+              {id:"learn", n:"learn", lbl:"学習"},
+              {id:"news",  n:"news",  lbl:"ニュース"},
+              {id:"talk",  n:"globe", lbl:"トーク"},
+              {id:"gacha", n:"gift",  lbl:"ガチャ"},
             ].map(({id,n,lbl})=>(
               <button key={id} className={`ni${navTab===id?" on":""}`}
                 onClick={()=>{
@@ -4180,19 +4781,31 @@ function EigoMasterInner() {
           <div className="mov">
             <div className="msh" style={{paddingBottom:32}}>
               <div className="mhnd"/>
-              <div style={{textAlign:'center',marginBottom:20}}>
+              <div style={{textAlign:'center',marginBottom:16}}>
                 <div style={{fontSize:36,marginBottom:8}}>
-                  {proc.step==='transcript'?'📡':proc.step==='ai'?'🤖':proc.step==='saving'?'💾':'✨'}
+                  {proc.step==='transcript'?'📡':proc.step==='ai'?'🤖':proc.step==='saving'?'💾':proc.step==='error'?'⚠️':'✨'}
                 </div>
                 <div className="jp" style={{fontSize:17,fontWeight:700,marginBottom:4}}>
-                  {proc.step==='transcript'&&'字幕を取得中...'}
-                  {proc.step==='ai'&&'AIがChunkを生成中...'}
-                  {proc.step==='saving'&&'Supabaseに保存中...'}
-                  {proc.step==='done'&&'完了！'}
+                  {proc.step==='transcript'&&'Fetching subtitles...'}
+                  {proc.step==='ai'&&'AI generating chunks...'}
+                  {proc.step==='saving'&&'Saving to database...'}
+                  {proc.step==='done'&&'Complete! 🎉'}
+                  {proc.step==='error'&&'Error'}
                 </div>
-                <div className="jp" style={{fontSize:13,color:'var(--t3)',marginBottom:16}}>
+                {proc.errorMsg && (
+                  <div style={{background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:"var(--rs)",padding:"10px 12px",margin:"8px 0",textAlign:"left"}}>
+                    <div className="jp" style={{fontSize:12,color:"#991B1B",lineHeight:1.5}}>⚠️ {proc.errorMsg}</div>
+                  </div>
+                )}
+                <div className="jp" style={{fontSize:12,color:'var(--t3)',marginBottom:12}}>
                   {proc.videoTitle}
                 </div>
+                {proc.step==='transcript'&&(
+                  <div className="jp" style={{fontSize:12,color:'var(--t2)',marginBottom:10,lineHeight:1.6,background:'var(--pl)',padding:'8px 12px',borderRadius:'var(--rs)'}}>
+                    Fetching English subtitles from YouTube...<br/>
+                    <span style={{fontSize:11,color:'var(--t3)'}}>字幕なし動画は手動入力モードへ切替</span>
+                  </div>
+                )}
               </div>
               {/* プログレスバー */}
               <div style={{height:8,background:'var(--bd)',borderRadius:4,overflow:'hidden',marginBottom:8}}>
@@ -4221,32 +4834,62 @@ function EigoMasterInner() {
           <div className="mov" onClick={e=>e.target===e.currentTarget&&setProc(p=>({...p,active:false}))}>
             <div className="msh">
               <div className="mhnd"/>
-              <div style={{fontSize:17,fontWeight:700,marginBottom:4,fontFamily:"'Noto Sans JP'"}}>📋 字幕を貼り付け</div>
-              <div className="jp" style={{fontSize:13,color:'var(--t3)',marginBottom:4}}>
-                自動取得できませんでした。YouTubeの「字幕を表示」からコピーして貼り付けてください。
-              </div>
-              <div style={{background:'var(--pl)',borderRadius:'var(--rs)',padding:'10px 12px',marginBottom:16,display:'flex',gap:8,alignItems:'flex-start'}}>
-                <span style={{fontSize:16}}>💡</span>
-                <div className="jp" style={{fontSize:12,color:'var(--p)',lineHeight:1.6}}>
-                  YouTube動画ページ → <b>「...」メニュー</b> → <b>「字幕を開く」</b><br/>
-                  表示されたテキストをすべてコピーして貼り付け
+              {/* タイトル */}
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                <span style={{fontSize:22}}>📋</span>
+                <div>
+                  <div style={{fontSize:16,fontWeight:700,fontFamily:"'Noto Sans JP'"}}>字幕テキストを貼り付け</div>
+                  <div className="jp" style={{fontSize:11,color:'var(--t3)'}}>自動取得できませんでした</div>
                 </div>
               </div>
+
+              {/* エラー詳細 */}
+              {proc.errorMsg && (
+                <div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:'var(--rs)',padding:'10px 12px',marginBottom:12}}>
+                  <div className="jp" style={{fontSize:12,color:'#991B1B',lineHeight:1.5}}>
+                    ⚠️ {proc.errorMsg}
+                  </div>
+                </div>
+              )}
+
+              {/* 使い方ガイド */}
+              <div style={{background:'var(--pl)',borderRadius:'var(--rs)',padding:'10px 12px',marginBottom:14,display:'flex',gap:8,alignItems:'flex-start'}}>
+                <span style={{fontSize:15,flexShrink:0}}>💡</span>
+                <div className="jp" style={{fontSize:12,color:'var(--p)',lineHeight:1.7}}>
+                  <b>YouTube字幕のコピー方法：</b><br/>
+                  動画ページ →「…」メニュー→「字幕を開く」<br/>
+                  または動画下の「…」→「文字起こしを開く」<br/>
+                  表示されたテキストを全選択してコピー
+                </div>
+              </div>
+
+              {/* 動画タイトル */}
+              {proc.videoTitle && (
+                <div className="jp" style={{fontSize:12,color:'var(--t2)',marginBottom:8,padding:'6px 10px',background:'var(--bg)',borderRadius:'var(--rs)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  🎬 {proc.videoTitle}
+                </div>
+              )}
+
+              {/* テキストエリア */}
               <textarea
                 value={manualText}
                 onChange={e=>setManualText(e.target.value)}
-                placeholder={"英語の字幕テキストをここに貼り付けてください...\n\nHello everyone, welcome to today's video.\nToday we're going to talk about..."}
-
-
-
-                style={{width:'100%',minHeight:160,padding:'10px 12px',border:'1.5px solid var(--bd)',borderRadius:'var(--rs)',fontFamily:'inherit',fontSize:13,outline:'none',resize:'vertical',marginBottom:12,lineHeight:1.6,background:'var(--bg)'}}
+                placeholder={"英語の字幕テキストをここに貼り付けてください...\n\nHello everyone, welcome to today's video.\nToday we're going to talk about how to..."}
+                style={{width:'100%',minHeight:150,padding:'10px 12px',border:'1.5px solid var(--bd)',borderRadius:'var(--rs)',fontFamily:'inherit',fontSize:13,outline:'none',resize:'vertical',marginBottom:8,lineHeight:1.6,background:'var(--bg)',transition:'border-color .2s'}}
+                onFocus={e=>{e.target.style.borderColor='var(--p)';}}
+                onBlur={e=>{e.target.style.borderColor='var(--bd)';}}
               />
+              <div className="jp" style={{fontSize:11,color:'var(--t3)',marginBottom:12}}>
+                {manualText.length > 0 ? `${manualText.length}文字 入力済み` : '英文を貼り付けると自動でAI処理します'}
+              </div>
+
+              {/* ボタン */}
               <div style={{display:'flex',gap:8}}>
-                <button className="bg" style={{flex:1}} onClick={()=>setProc(p=>({...p,active:false,needManual:false}))}>
+                <button className="bg" style={{flex:1}} onClick={()=>setProc(p=>({...p,active:false,needManual:false,errorMsg:''}))}>
                   キャンセル
                 </button>
                 <button className="bp" style={{flex:2}} disabled={!manualText.trim() || manualLoading} onClick={submitManualTranscript}>
-                  {manualLoading ? '生成中...' : '🤖 AIでChunk生成'}
+                  {manualLoading ? '⏳ 生成中...' : '🤖 AIでChunk生成する'}
                 </button>
               </div>
             </div>
@@ -4340,7 +4983,14 @@ function EigoMasterInner() {
         )}
 
         {/* ── Toast ── */}
-        {toast&&<div className="toast">{toast}</div>}
+        {toast&&(
+          <div className={`toast toast-${toast.type}`}>
+            {toast.type==='ok'&&'✅ '}
+            {toast.type==='ng'&&'❌ '}
+            {toast.type==='warn'&&'⚠️ '}
+            {toast.msg}
+          </div>
+        )}
         <UnlockModal/>
         <NicknameModal/>
         {showRanking && (

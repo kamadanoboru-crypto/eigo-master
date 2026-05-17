@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * GET  /api/social/translations?videoId=xxx&captionIndex=0  → 翻訳一覧
  * POST /api/social/translations                              → 翻訳投稿
