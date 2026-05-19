@@ -542,7 +542,7 @@ const fetchTranscript = async (videoId) => {
   }
 
   console.debug('[fetchTranscript] 全戦略失敗');
-  return { ok: false, reason: '字幕の自動取得に失敗しました。手動で字幕テキストを貼り付けてください。' };
+  return { ok: false, reason: 'この動画は英語字幕が見つかりませんでした。\nTED / BBC / English Speeches など、字幕付き動画で試してください。\nまたは下に英語字幕を貼り付けて続行できます。' };
 };
 
 // ③ Anthropic API: チャンク生成（AI差し替えポイント - モデル・プロンプト変更可）
@@ -2320,9 +2320,10 @@ function EigoMasterInner() {
   };
 
   // ── url add（oEmbed + AI自動処理）──────────────────────────
-  const addUrl = async () => {
-    if (!urlIn.trim()) return;
-    const m = urlIn.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  const addUrl = async (overrideUrl?: string) => {
+    const targetUrl = typeof overrideUrl === 'string' ? overrideUrl : urlIn;
+    if (!targetUrl.trim()) return;
+    const m = targetUrl.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
     if (!m) { t$('有効なYouTube URLを入力してください','ng'); return; }
     const id = m[1];
     if (videos.some(v => v.videoId === id)) { t$('既存の動画です！','ok'); setUrlIn(''); return; }
@@ -2515,11 +2516,13 @@ function EigoMasterInner() {
                   <div style={{fontSize:13,fontWeight:600,lineHeight:1.4,marginBottom:4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{v.title}</div>
                   <div style={{fontSize:11,color:"var(--t3)",marginBottom:6}}>{v.channelTitle}</div>
                   <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-                    {(captionCache[v.videoId]||DUMMY_CAPTIONS[v.videoId])
+                    {(captionCache[v.videoId]||DUMMY_CAPTIONS[v.videoId]||v.aiReady)
                       ? <span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:4,background:"#D1FAE5",color:"#059669"}}>✨ AI Ready</span>
                       : proc.videoId===v.videoId&&proc.active
-                        ? <span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:4,background:"var(--al)",color:"#B45309"}}>⚙️ {proc.pct}%</span>
-                        : <span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:4,background:"var(--pl)",color:"var(--p)"}}>Tap to study</span>
+                        ? <span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:4,background:"var(--al)",color:"#B45309"}}>⚙️ 処理中</span>
+                        : v.aiReady === false
+                          ? <span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:4,background:"#FEE2E2",color:"#991B1B"}}>⚠️ 字幕未対応 (手動入力可)</span>
+                          : <span style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:4,background:"var(--pl)",color:"var(--p)"}}>Tap to study</span>
                     }
                     {myList.some(m=>m.videoId===v.videoId)&&<span style={{fontSize:10,color:"var(--a)",fontWeight:700}}>📌</span>}
                   </div>
@@ -4846,19 +4849,30 @@ function EigoMasterInner() {
               {/* エラー詳細 */}
               {proc.errorMsg && (
                 <div style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:'var(--rs)',padding:'10px 12px',marginBottom:12}}>
-                  <div className="jp" style={{fontSize:12,color:'#991B1B',lineHeight:1.5}}>
+                  <div className="jp" style={{fontSize:12,color:'#991B1B',lineHeight:1.5,whiteSpace:'pre-wrap'}}>
                     ⚠️ {proc.errorMsg}
                   </div>
                 </div>
               )}
 
+              {/* おすすめ動画 */}
+              <div style={{marginBottom:14, background:'var(--pl)', borderRadius:'var(--rs)', padding:'10px 12px'}}>
+                <div style={{fontSize:12, fontWeight:700, color:'var(--p)', marginBottom:8, display:'flex', alignItems:'center', gap:4}}>
+                  <span>▶️</span> 字幕付きおすすめ動画を試す：
+                </div>
+                <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
+                  <button className="bg" style={{padding:'6px 12px', fontSize:11, flex:'1 1 auto', background:'#fff', borderColor:'#BFDBFE'}} onClick={()=>{setProc(p=>({...p,active:false})); addUrl("https://www.youtube.com/watch?v=aGJDmCgG44c");}}>TED</button>
+                  <button className="bg" style={{padding:'6px 12px', fontSize:11, flex:'1 1 auto', background:'#fff', borderColor:'#BFDBFE'}} onClick={()=>{setProc(p=>({...p,active:false})); addUrl("https://www.youtube.com/watch?v=MhJEw1U6mB4");}}>BBC Learning English</button>
+                  <button className="bg" style={{padding:'6px 12px', fontSize:11, flex:'1 1 auto', background:'#fff', borderColor:'#BFDBFE'}} onClick={()=>{setProc(p=>({...p,active:false})); addUrl("https://www.youtube.com/watch?v=F0fE-rFk-pE");}}>English Speeches</button>
+                </div>
+              </div>
+
               {/* 使い方ガイド */}
-              <div style={{background:'var(--pl)',borderRadius:'var(--rs)',padding:'10px 12px',marginBottom:14,display:'flex',gap:8,alignItems:'flex-start'}}>
+              <div style={{background:'var(--bg)',borderRadius:'var(--rs)',padding:'10px 12px',marginBottom:14,display:'flex',gap:8,alignItems:'flex-start'}}>
                 <span style={{fontSize:15,flexShrink:0}}>💡</span>
-                <div className="jp" style={{fontSize:12,color:'var(--p)',lineHeight:1.7}}>
-                  <b>YouTube字幕のコピー方法：</b><br/>
+                <div className="jp" style={{fontSize:11,color:'var(--t2)',lineHeight:1.7}}>
+                  <b>YouTube字幕の手動コピー方法：</b><br/>
                   動画ページ →「…」メニュー→「字幕を開く」<br/>
-                  または動画下の「…」→「文字起こしを開く」<br/>
                   表示されたテキストを全選択してコピー
                 </div>
               </div>
