@@ -1277,32 +1277,29 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
             color: '#fff',
             fontSize: 15,
             fontWeight: 700
-          }}>{(wsCurrentWord === null || wsCurrentWord === void 0 ? void 0 : wsCurrentWord.en) || wsWrong.en}</div>}{/*#__PURE__*/<div style={{
+          }}>{wsWrong.en}</div>}{/*#__PURE__*/<div style={{
             color: '#94A3B8',
             fontSize: 12,
             fontFamily: "'Noto Sans JP'",
             marginTop: 2
-          }}>正解の意味: {wsCurrentWord === null || wsCurrentWord === void 0 ? void 0 : wsCurrentWord.jp}</div>}{wsWrong.jp && wsWrong.jp !== (wsCurrentWord === null || wsCurrentWord === void 0 ? void 0 : wsCurrentWord.jp) && /*#__PURE__*/<div style={{
+          }}>正解の意味: {wsWrong.correct}</div>}{wsWrong.jp && wsWrong.jp !== wsWrong.correct && /*#__PURE__*/<div style={{
             color: '#D8C7A1',
             fontSize: 11,
             marginTop: 3,
             fontFamily: "'Noto Sans JP'"
-          }}>あなたが選んだ日本語の英語: {wsWrong.jp}</div>}</div>}{wsCurrentWord && !(wsChoiceResult === null || wsChoiceResult === void 0 ? void 0 : wsChoiceResult.sel) && /*#__PURE__*/<div className="ws-word" style={{
-          left: "".concat(wsCurrentWord.x, "%"),
-          animationDuration: wsSlowed ? '18s' : '9s',
-          animationDelay: '0s'
-        }} onAnimationEnd={() => {
-          // 時間切れ → HP減少 → 次の問題
-          handleWsChoice('__timeout__');
-        }}>{/*#__PURE__*/<div className="ws-word-en">{wsSkills.hint > 0 ? /*#__PURE__*/<>{/*#__PURE__*/<span style={{
-                color: '#FCD34D',
-                textDecoration: 'underline'
-              }}>{wsCurrentWord.en[0]}</span>}{wsCurrentWord.en.slice(1)}</> : wsCurrentWord.en}</div>}</div>}{wsCurrentWord && (wsChoiceResult === null || wsChoiceResult === void 0 ? void 0 : wsChoiceResult.sel) === wsCurrentWord.jp && /*#__PURE__*/<div className="ws-word ws-hit" style={{
-          left: "".concat(wsCurrentWord.x, "%"),
+          }}>あなたが選んだ日本語の英語: {wsWrong.jp}</div>}</div>}{activeWords().map((word, idx) => (wsChoiceResult?.wordId === word.id && wsChoiceResult?.sel === word.jp) ? /*#__PURE__*/<div key={word.id} className="ws-word ws-hit" style={{
+          left: "".concat(word.x, "%"),
           top: '40%'
         }}>{/*#__PURE__*/<div className="ws-word-en" style={{
             background: 'rgba(16,185,129,.8)'
-          }}>{wsCurrentWord.en} ✅</div>}</div>}{wsWordQueue.length === 0 && !wsCurrentWord && wsPhase === 'play' && /*#__PURE__*/<div style={{
+          }}>{word.en} OK</div>}</div> : /*#__PURE__*/<div key={word.id} className="ws-word" style={{
+          left: "".concat(word.x, "%"),
+          animationDuration: wsSlowed ? '18s' : '9s',
+          animationDelay: "".concat(idx * .35, "s")
+        }} onAnimationEnd={() => handleWsChoice('__timeout__', word.id)}>{/*#__PURE__*/<div className="ws-word-en">{wsSkills.hint > 0 ? /*#__PURE__*/<>{/*#__PURE__*/<span style={{
+              color: '#FCD34D',
+              textDecoration: 'underline'
+            }}>{word.en[0]}</span>}{word.en.slice(1)}</> : word.en}</div>}</div>)}{wsWordQueue.length === 0 && activeWords().length === 0 && wsPhase === 'play' && /*#__PURE__*/<div style={{
           position: 'absolute',
           inset: 0,
           display: 'flex',
@@ -1312,11 +1309,11 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
             color: '#fff',
             fontSize: 22,
             fontWeight: 700
-          }}>🎉 クリア！</div>}</div>}{/*#__PURE__*/<div className="ws-active-count">残り {wsWordQueue.length + (wsCurrentWord ? 1 : 0)}</div>}</div>}{/*#__PURE__*/<div className="ws-choices">{wsChoices.map((jp, i) => {
+          }}>🎉 クリア！</div>}</div>}{/*#__PURE__*/<div className="ws-active-count">残り {wsWordQueue.length + activeWords().length} / Stage {wsStage}</div>}</div>}{/*#__PURE__*/<div className="ws-choices">{wsChoices.map((jp, i) => {
           const isSelected = (wsChoiceResult === null || wsChoiceResult === void 0 ? void 0 : wsChoiceResult.sel) === jp;
           const isCorrect = wsChoiceResult && jp === wsChoiceResult.correct;
           const isWrong = isSelected && jp !== (wsChoiceResult === null || wsChoiceResult === void 0 ? void 0 : wsChoiceResult.correct);
-          return /*#__PURE__*/<button key={jp?.id ?? i} className={"ws-choice ".concat(isCorrect ? 'correct' : '', " ").concat(isWrong ? 'wrong' : '')} disabled={!!wsChoiceResult} onClick={() => handleWsChoice(jp)}>{jp}</button>;
+          return /*#__PURE__*/<button key={jp?.id ?? i} className={"ws-choice ".concat(isCorrect ? 'correct' : '', " ").concat(isWrong ? 'wrong' : '')} onClick={() => handleWsChoice(jp)}>{jp}</button>;
         })}</div>}</div>;
   };
   ;
@@ -1905,31 +1902,59 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     }];
   };
   // ── 4択選択肢を生成（正解1 + ダミー3）────────────────────────
+  const activeWords = () => Array.isArray(wsCurrentWord) ? wsCurrentWord : wsCurrentWord ? [wsCurrentWord] : [];
+  const stageSize = (done, total) => {
+    if (total <= 5) return done < 2 ? 1 : done < 4 ? 2 : 3;
+    if (done < Math.ceil(total / 3)) return 1;
+    if (done < Math.ceil(total * 2 / 3)) return 2;
+    return 3;
+  };
+  const makeActiveWord = (word, slot) => {
+    const lanes = [18, 48, 72];
+    return {
+      id: "".concat(Date.now(), "-").concat(slot, "-").concat(Math.random().toString(36).slice(2, 7)),
+      en: word.en,
+      jp: word.jp,
+      x: lanes[slot % lanes.length] + (Math.random() * 8 - 4)
+    };
+  };
   const makeChoices = (correct, pool) => {
-    const wrong = shuffle(pool.filter(w => w.jp !== correct)).slice(0, 7).map((w, __idx) => w.jp);
-    return shuffle([correct, ...wrong]);
+    const corrects = Array.from(new Set((Array.isArray(correct) ? correct : [correct]).filter(Boolean)));
+    const correctSet = new Set(corrects);
+    const wrong = [];
+    shuffle(pool).forEach(w => {
+      if (wrong.length >= 8 - corrects.length) return;
+      if (!w.jp || correctSet.has(w.jp) || wrong.includes(w.jp)) return;
+      wrong.push(w.jp);
+    });
+    ['契約', '請求書', '在庫', '面接', '部署', '締切', '承認', '予算', '研修', '顧客'].forEach(jp => {
+      if (wrong.length >= 8 - corrects.length) return;
+      if (!correctSet.has(jp) && !wrong.includes(jp)) wrong.push(jp);
+    });
+    return shuffle([...corrects, ...wrong]).slice(0, 8);
   };
   // ── 次の問題をセット ─────────────────────────────────────────
-  const nextQuestion = queue => {
-    if (!queue.length) {
-      // クリア！
+  const refreshShooter = (nextActive, nextQueue) => {
+    const total = Math.max(wsQuizWords.length, nextActive.length + nextQueue.length);
+    const done = Math.max(0, total - nextActive.length - nextQueue.length);
+    const target = stageSize(done, total);
+    const filled = [...nextActive];
+    const rest = [...nextQueue];
+    while (filled.length < target && rest.length) {
+      filled.push(makeActiveWord(rest.shift(), filled.length));
+    }
+    setWsStage(target);
+    setWsWordQueue(rest);
+    setWsCurrentWord(filled.length ? filled : null);
+    setWsChoices(filled.length ? makeChoices(filled.map(w => w.jp), [...buildWordPool(), ...wsQuizWords]) : []);
+    setWsChoiceResult(null);
+    if (!filled.length && !rest.length) {
       setWsPhase('result');
       setWsActive(false);
-      setWsCurrentWord(null);
-      return;
+      setWsPhaseScreen('result');
     }
-    const pool = buildWordPool();
-    const [next, ...rest] = queue;
-    setWsWordQueue(rest);
-    setWsCurrentWord({
-      id: String(Date.now()),
-      en: next.en,
-      jp: next.jp,
-      x: 15 + Math.random() * 60
-    });
-    setWsChoices(makeChoices(next.jp, pool));
-    setWsChoiceResult(null);
   };
+  const nextQuestion = (queue, current = []) => refreshShooter(current, queue);
   // ── ステージ開始 ─────────────────────────────────────────────
   const startWordShooter = async function () {
     let mode = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'test';
@@ -1984,9 +2009,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
       t$('Could not start word shooter.', 'warn');
       return;
     }
-    const first = queue[0];
-    const choicePool = [...localPool, ...generatedWords];
-    if (generatedWords.length) setWsQuizWords(generatedWords);
+    setWsQuizWords(queue);
     setWsScore(0);
     setWsLives(wsEquipped.includes('shield') ? wsMaxLives + 1 : wsMaxLives);
     setWsMaxLives(wsEquipped.includes('shield') ? 6 : 5);
@@ -2006,14 +2029,10 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
       heal: skillCount.heal + 1
     });
     setWsSlowed(false);
+    setWsStage(1);
     setWsWordQueue(queue.slice(1));
-    setWsCurrentWord({
-      id: String(Date.now()),
-      en: first.en,
-      jp: first.jp,
-      x: 15 + Math.random() * 60
-    });
-    setWsChoices(makeChoices(first.jp, choicePool));
+    setWsCurrentWord([makeActiveWord(queue[0], 0)]);
+    setWsChoices(makeChoices(queue[0].jp, [...localPool, ...generatedWords]));
     setWsChoiceResult(null);
     setWsPhase('play');
     setWsActive(true);
@@ -2057,10 +2076,12 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     });
   };
   // ── 4択を選ぶ ────────────────────────────────────────────────
-  const handleWsChoice = jp => {
-    // タイムアウト（落下終了）の場合はHP減少して次へ
+  const handleWsChoice = (jp, wordId = null) => {
+    const current = activeWords();
+    if (!current.length) return;
     if (jp === '__timeout__') {
-      if (!wsCurrentWord) return;
+      const missed = current.find(w => w.id === wordId) || current[0];
+      const remainingActive = current.filter(w => w.id !== missed.id);
       setWsFlash(true);
       setTimeout(() => setWsFlash(false), 400);
       setWsCombo(0);
@@ -2074,67 +2095,63 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
           }, 800);
           return 0;
         }
+        setTimeout(() => refreshShooter(remainingActive, wsWordQueue), 250);
         return next;
       });
-      setTimeout(() => {
-        setWsCurrentWord(null);
-        nextQuestion(wsWordQueue);
-      }, 600);
       return;
     }
-    if (!wsCurrentWord || wsChoiceResult) return;
-    const correct = wsCurrentWord.jp;
-    const isOk = jp === correct;
-    setWsChoiceResult({
-      sel: jp,
-      correct
-    });
-    if (isOk) {
-      // ✅ 正解
-      setWsHits(h => [...h, wsCurrentWord.id]);
+    const matched = current.find(w => w.jp === jp);
+    if (matched) {
+      setWsChoiceResult({
+        sel: jp,
+        correct: matched.jp,
+        wordId: matched.id
+      });
+      setWsHits(h => [...h, matched.id]);
       const gain = 10 + wsCombo * 2;
       setWsScore(s => s + gain);
       setWsCoins(c => c + Math.ceil(gain / 10));
       setWsCombo(c => c + 1);
       setTimeout(() => {
-        setWsHits(h => h.filter(id => id !== wsCurrentWord.id));
-        nextQuestion(wsWordQueue);
-      }, 500);
-    } else {
-      // ❌ 不正解
-      setWsFlash(true);
-      setTimeout(() => setWsFlash(false), 400);
-      // 不正解情報: 選んだjpに対応する正しい英語も探す
-      const pool = buildWordPool();
-      const selectedMeaning = pool.find(w => w.jp === jp);
-      var _selectedMeaning_en;
-      setWsWrong({
-        id: wsCurrentWord.id,
-        en: wsCurrentWord.en,
-        jp: (_selectedMeaning_en = selectedMeaning === null || selectedMeaning === void 0 ? void 0 : selectedMeaning.en) !== null && _selectedMeaning_en !== void 0 ? _selectedMeaning_en : jp
-      });
-      setWsCombo(0);
-      setWsLives(l => {
-        const next = l - 1;
-        if (next <= 0) {
-          setTimeout(() => {
-            setWsPhase('result');
-            setWsActive(false);
-            setWsPhaseScreen('result');
-          }, 1200);
-          return 0;
-        }
-        return next;
-      });
-      // 2秒後に次の問題
-      setTimeout(() => {
-        setWsWrong(null);
-        nextQuestion(wsWordQueue);
-      }, 2000);
+        setWsHits(h => h.filter(id => id !== matched.id));
+        refreshShooter(current.filter(w => w.id !== matched.id), wsWordQueue);
+      }, 300);
+      return;
     }
-  };
-  // スキル使用
-  const activateWsSkill = skill => {
+    const target = current[0];
+    setWsChoiceResult({
+      sel: jp,
+      correct: target.jp,
+      wordId: target.id
+    });
+    setWsFlash(true);
+    setTimeout(() => setWsFlash(false), 400);
+    const pool = buildWordPool();
+    const selectedMeaning = pool.find(w => w.jp === jp);
+    setWsWrong({
+      id: target.id,
+      en: target.en,
+      correct: target.jp,
+      jp: (selectedMeaning === null || selectedMeaning === void 0 ? void 0 : selectedMeaning.en) || jp
+    });
+    setWsCombo(0);
+    setWsLives(l => {
+      const next = l - 1;
+      if (next <= 0) {
+        setTimeout(() => {
+          setWsPhase('result');
+          setWsActive(false);
+          setWsPhaseScreen('result');
+        }, 1200);
+        return 0;
+      }
+      return next;
+    });
+    setTimeout(() => {
+      setWsWrong(null);
+      setWsChoiceResult(null);
+    }, 1200);
+  };  const activateWsSkill = skill => {
     var _wsSkills_skill;
     if (((_wsSkills_skill = wsSkills[skill]) !== null && _wsSkills_skill !== void 0 ? _wsSkills_skill : 0) <= 0) return;
     setWsSkills(s => ({
