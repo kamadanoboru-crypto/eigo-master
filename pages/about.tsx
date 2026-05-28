@@ -1,4 +1,4 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import Link from 'next/link';
 import styles from './pages.module.css';
 
@@ -6,24 +6,24 @@ export default function About() {
   return (
     <>
       <Head>
-        <title>英語マスターについて | 英語マスター</title>
-        <meta name="description" content="英語マスターについてのページです。アプリの概要と機能を紹介しています。" />
+        <title>English Baseについて | English Base</title>
+        <meta name="description" content="English Baseについてのページです。アプリの概要と機能を紹介しています。" />
       </Head>
       <div className={styles.container}>
         <header className={styles.header}>
           <Link href="/">
-            <a className={styles.logo}>🎓 英語マスター</a>
+            <a className={styles.logo}>🎓 English Base</a>
           </Link>
         </header>
 
         <main className={styles.main}>
           <article className={styles.article}>
-            <h1>英語マスターについて</h1>
+            <h1>English Baseについて</h1>
 
             <section>
               <h2>アプリの概要</h2>
               <p>
-                「英語マスター」は、YouTube動画やBBCニュースを使って<strong>英語を語順のまま理解する</strong>ことを目的とした学習アプリです。
+                「English Base」は、YouTube動画やBBCニュースを使って<strong>英語を語順のまま理解する</strong>ことを目的とした学習アプリです。
               </p>
               <p>
                 従来の日本語訳を見てから英語に戻る学習方法ではなく、英文の語順のまま意味を理解する訓練に特化しています。
@@ -37,7 +37,7 @@ export default function About() {
                 <li><strong>単語・文法・リスニングテスト</strong>：AIが自動生成、2回目以降はキャッシュから提供</li>
                 <li><strong>シューティング単語ゲーム</strong>：楽しく単語を学習</li>
                 <li><strong>ガチャシステム</strong>：スキルチケット取得で学習をゲーム化</li>
-                <li><strong>対訳リーダー</strong>：英文と翻訳を上下分割表示で学習</li>
+                <li><strong>英文記事リーダー</strong>：英文記事や教材を貼り付け、必要に応じて日本語訳と見比べながら学習</li>
                 <li><strong>BBC学習モード</strong>：ニュース英文を単語・文単位で学習</li>
               </ul>
             </section>
@@ -104,11 +104,11 @@ export default function About() {
         <footer className={styles.footer}>
           <div className={styles.footerLinks}>
             <Link href="/">ホーム</Link>
-            <Link href="/privacy-policy">プライバシーポリシー</Link>
+            <Link href="/privacy">プライバシーポリシー</Link>
             <Link href="/terms">利用規約</Link>
             <Link href="/contact">お問い合わせ</Link>
           </div>
-          <p>&copy; 2025 英語マスター. All rights reserved.</p>
+          <p>&copy; 2025 English Base. All rights reserved.</p>
         </footer>
       </div>
     </>

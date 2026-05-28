@@ -1,4 +1,4 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import Link from 'next/link';
 import styles from './pages.module.css';
 
@@ -6,25 +6,25 @@ export default function PrivacyPolicy() {
   return (
     <>
       <Head>
-        <title>プライバシーポリシー | 英語マスター</title>
-        <meta name="description" content="英語マスターのプライバシーポリシーです。個人情報の取り扱いについて説明しています。" />
+        <title>プライバシーポリシー | English Base</title>
+        <meta name="description" content="English Baseのプライバシーポリシーです。個人情報の取り扱いについて説明しています。" />
       </Head>
       <div className={styles.container}>
         <header className={styles.header}>
           <Link href="/">
-            <a className={styles.logo}>🎓 英語マスター</a>
+            <a className={styles.logo}>🎓 English Base</a>
           </Link>
         </header>
 
         <main className={styles.main}>
           <article className={styles.article}>
             <h1>プライバシーポリシー</h1>
-            <p className={styles.lastUpdate}>最終更新日：2025年5月</p>
+            <p className={styles.lastUpdate}>最終更新日：2026年5月</p>
 
             <section>
               <h2>1. はじめに</h2>
               <p>
-                「英語マスター」（以下「本アプリ」）は、ユーザーのプライバシーを重視しています。本プライバシーポリシーは、本アプリにおける個人情報の取り扱いについて説明しています。
+                「English Base」（以下「本アプリ」）は、ユーザーのプライバシーを重視しています。本プライバシーポリシーは、本アプリにおける個人情報の取り扱いについて説明しています。
               </p>
             </section>
 
@@ -35,6 +35,7 @@ export default function PrivacyPolicy() {
               <ul>
                 <li>Google Account情報（ログイン時のみ）</li>
                 <li>学習履歴・成績データ</li>
+                <li>AI翻訳・AIアドバイス生成に必要な学習状況、過去のアドバイス履歴</li>
                 <li>お問い合わせフォーム入力内容</li>
               </ul>
 
@@ -62,8 +63,16 @@ export default function PrivacyPolicy() {
                   アクセス解析・利用統計（個人を特定しない形で集計）
                 </li>
                 <li>Google AdSenseによる適切な広告配信</li>
+                <li>アフィリエイトリンクの効果測定、学習サービスの推薦</li>
                 <li>利用規約等の遵守確認</li>
               </ul>
+            </section>
+
+            <section>
+              <h2>3.1 AI機能について</h2>
+              <p>
+                本アプリは、翻訳、単語解説、学習アドバイス等の生成にAIサービスを利用する場合があります。AI生成の品質向上とコスト削減のため、一度生成した翻訳・アドバイス等をデータベースに保存し、同様の学習場面で再利用することがあります。
+              </p>
             </section>
 
             <section>
@@ -132,7 +141,7 @@ export default function PrivacyPolicy() {
             <Link href="/terms">利用規約</Link>
             <Link href="/contact">お問い合わせ</Link>
           </div>
-          <p>&copy; 2025 英語マスター. All rights reserved.</p>
+          <p>&copy; 2025 English Base. All rights reserved.</p>
         </footer>
       </div>
     </>

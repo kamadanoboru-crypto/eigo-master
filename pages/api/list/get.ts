@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { sbFrom, getUserId } from '../../../lib/supabase';
+import { sbFrom } from '../../../lib/supabase';
 
 interface PlaylistItem {
   id: string;
@@ -21,7 +21,8 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const userId = getUserId();
+  const userId = typeof req.query.userId === 'string' ? req.query.userId : '';
+  if (!userId) return res.status(400).json({ error: 'userId required' });
 
   try {
     const sb = sbFrom('my_playlist');

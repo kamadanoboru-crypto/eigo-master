@@ -1,6 +1,6 @@
 /**
  * GET /api/transcript?videoId=XXXXXXXXXXX
- * v2.3 - 本番運用レビュー対応版
+ * v2.4 - 本番運用レビュー対応版
  *
  * CRITICAL修正:
  *  [1] Vercelタイムアウト超過 → 全体 maxDuration=25s, 各fetch 5s以内に縮小
@@ -11,13 +11,16 @@
  *  - 並列リクエスト重複排除 (Deduplication)
  *  - 詳細ログ (どの戦略で止まったか可視化)
  *  - UAローテーション (簡易ボット回避)
+ *  - FetchTranscript API フォールバック
+ *  - YouTube本体がVercelを制限した場合のInvidious字幕APIフォールバック
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { YoutubeTranscript } from 'youtube-transcript';
 
 // Vercel: Hobby=10s, Pro=60s。25sを明示指定（Pro前提）
 // Hobby tierの場合はvercel.jsonで functions."api/transcript/index.maxDuration"=10 に下げること
-export const config = { maxDuration: 25 };
+export const config = { maxDuration: 25, regions: ['hnd1'] };
 
 // ── タイムアウト設計 ──────────────────────────────────────────
 // 戦略A: ページ取得(5s) + XML取得(4s) = 最大 9s
@@ -26,6 +29,10 @@ export const config = { maxDuration: 25 };
 const T_PAGE = 5000;
 const T_XML  = 4000;
 const T_TAPI = 3000;
+const T_INV  = 6000;
+const T_FETCHTRANSCRIPT = 12000;
+const FETCHTRANSCRIPT_API_KEY = process.env.FETCHTRANSCRIPT_API_KEY ?? '';
+const MAX_STUDY_CAPTIONS = 120;
 
 // ── UAローテーション ─────────────────────────────────────────
 const UAS = [
@@ -59,6 +66,7 @@ const inflight = new Map<string, Promise<Segment[] | null>>();
 
 // ── 型 ───────────────────────────────────────────────────────
 export interface Segment { start: number; duration: number; text: string; }
+interface TimedSentence { text: string; start: number; duration: number; }
 
 // ── ロガー ────────────────────────────────────────────────────
 const L = (tag: string, msg: string, d?: unknown) =>
@@ -85,22 +93,87 @@ function parseXml(xml: string): Segment[] {
   return segs;
 }
 
+function parseJson3(raw: string): Segment[] {
+  try {
+    const data = JSON.parse(raw);
+    const events = Array.isArray(data?.events) ? data.events : [];
+    return events
+      .map((event: any) => {
+        const text = Array.isArray(event.segs)
+          ? event.segs.map((seg: any) => seg?.utf8 ?? '').join('').replace(/\s+/g, ' ').trim()
+          : '';
+        return {
+          start: Number(event.tStartMs ?? 0) / 1000,
+          duration: Number(event.dDurationMs ?? 0) / 1000,
+          text,
+        };
+      })
+      .filter((seg: Segment) => seg.text && !/^\[[^\]]+\]$/.test(seg.text));
+  } catch {
+    return [];
+  }
+}
+
+function parseVttTime(time: string): number {
+  const parts = time.trim().split(':').map(Number);
+  if (parts.some(Number.isNaN)) return 0;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return parts[0] || 0;
+}
+
+function parseVtt(vtt: string): Segment[] {
+  const segs: Segment[] = [];
+  const blocks = vtt.replace(/\r/g, '').split(/\n{2,}/);
+  for (const block of blocks) {
+    const lines = block.split('\n').map(line => line.trim()).filter(Boolean);
+    const timeLineIndex = lines.findIndex(line => line.includes('-->'));
+    if (timeLineIndex < 0) continue;
+
+    const [fromRaw, toRaw] = lines[timeLineIndex].split('-->').map(s => s.trim().split(/\s+/)[0]);
+    const text = lines
+      .slice(timeLineIndex + 1)
+      .join(' ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!text || /^(WEBVTT|Kind:|Language:|NOTE)/i.test(text)) continue;
+
+    const start = parseVttTime(fromRaw);
+    const end = parseVttTime(toRaw);
+    segs.push({ start, duration: Math.max(0, end - start), text: dec(text) });
+  }
+  return segs;
+}
+
 // ── セグメント→文グループ化 ──────────────────────────────────
 export function groupToSentences(segs: Segment[]): string[] {
-  const out: string[] = [];
+  return groupToTimedSentences(segs).map(item => item.text);
+}
+
+export function groupToTimedSentences(segs: Segment[]): TimedSentence[] {
+  const out: TimedSentence[] = [];
   let buf = '', wc = 0;
+  let start: number | null = null;
+  let end = 0;
   for (const seg of segs) {
     const w = seg.text.replace(/\n/g,' ').trim();
     if (!w) continue;
+    if (start === null) start = seg.start;
+    end = Math.max(end, seg.start + seg.duration);
     buf += (buf ? ' ' : '') + w;
     wc  += w.split(/\s+/).length;
     if (wc >= 12 || /[.!?]$/.test(w)) {
-      if (buf.split(/\s+/).length >= 4) out.push(buf.trim());
-      buf = ''; wc = 0;
+      if (buf.split(/\s+/).length >= 4) {
+        out.push({ text: buf.trim(), start: start ?? 0, duration: Math.max(0.5, end - (start ?? 0)) });
+      }
+      buf = ''; wc = 0; start = null; end = 0;
     }
   }
-  if (buf.split(/\s+/).length >= 4) out.push(buf.trim());
-  return out.slice(0, 20);
+  if (buf.split(/\s+/).length >= 4) {
+    out.push({ text: buf.trim(), start: start ?? 0, duration: Math.max(0.5, end - (start ?? 0)) });
+  }
+  return out.slice(0, MAX_STUDY_CAPTIONS);
 }
 
 // ── XML URL取得 ───────────────────────────────────────────────
@@ -118,6 +191,21 @@ async function fetchXml(url: string, tag: string): Promise<Segment[] | null> {
     L(tag, `xml parsed: ${segs.length} segments`);
     return segs.length > 0 ? segs : null;
   } catch(e) { LE(tag, 'xml fetch', e); return null; }
+}
+
+async function fetchCaptionUrl(url: string, tag: string): Promise<Segment[] | null> {
+  L(tag, `caption fetch: ${url.slice(0,70)}...`);
+  try {
+    const r = await fetch(url, {
+      headers: { 'User-Agent': getUA(), 'Accept-Language': 'en-US,en;q=0.9' },
+      signal: AbortSignal.timeout(T_XML),
+    });
+    if (!r.ok) { L(tag, `caption HTTP ${r.status}`); return null; }
+    const body = await r.text();
+    const segs = body.trim().startsWith('{') ? parseJson3(body) : parseXml(body);
+    L(tag, `caption parsed: ${segs.length} segments`);
+    return segs.length > 0 ? segs : null;
+  } catch(e) { LE(tag, 'caption fetch', e); return null; }
 }
 
 // ── 戦略A: ページパース (CRITICAL#2修正済み) ──────────────────
@@ -175,34 +263,162 @@ async function strategyA(videoId: string): Promise<Segment[] | null> {
     }
     if (!url) { L('A', 'no url'); return null; }
 
-    return await fetchXml(url, 'A');
+    return await fetchCaptionUrl(url.includes('fmt=')
+      ? url
+      : `${url}${url.includes('?') ? '&' : '?'}fmt=json3`, 'A');
   } catch(e) { LE('A', 'error', e); return null; }
 }
 
 // ── 戦略B: timedtext API直接 ─────────────────────────────────
 async function strategyB(videoId: string): Promise<Segment[] | null> {
-  const langs = ['en','a.en','en-US','en-GB'];
+  const langs = ['en','en-US','en-GB','ja'];
+  const variants = [
+    (lang: string) => `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}&fmt=json3`,
+    (lang: string) => `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}&kind=asr&fmt=json3`,
+    (lang: string) => `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}&fmt=xml`,
+    (lang: string) => `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}&kind=asr&fmt=xml`,
+  ];
   L('B', `start: ${langs.join(',')}`);
   for (const lang of langs) {
-    try {
-      L('B', `trying lang=${lang}`);
-      const url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}&fmt=xml`;
-      const r = await fetch(url, {
-        headers: { 'User-Agent': getUA(), 'Accept-Language': 'en-US,en;q=0.9' },
-        signal: AbortSignal.timeout(T_TAPI),
-      });
-      if (!r.ok) { L('B', `lang=${lang} HTTP ${r.status}`); continue; }
-      const xml = await r.text();
-      if (!xml.includes('<text')) { L('B', `lang=${lang}: no <text>`); continue; }
-      const segs = parseXml(xml);
-      if (segs.length > 0) { L('B', `success lang=${lang}: ${segs.length} segs`); return segs; }
-    } catch(e) { L('B', `lang=${lang} error: ${e instanceof Error ? e.message : 'unknown'}`); }
+    for (const makeUrl of variants) {
+      try {
+        const url = makeUrl(lang);
+        L('B', `trying ${url}`);
+        const r = await fetch(url, {
+          headers: { 'User-Agent': getUA(), 'Accept-Language': 'en-US,en;q=0.9' },
+          signal: AbortSignal.timeout(T_TAPI),
+        });
+        if (!r.ok) { L('B', `HTTP ${r.status}`); continue; }
+        const body = await r.text();
+        const segs = body.trim().startsWith('{') ? parseJson3(body) : parseXml(body);
+        if (segs.length > 0) { L('B', `success lang=${lang}: ${segs.length} segs`); return segs; }
+      } catch(e) { L('B', `lang=${lang} error: ${e instanceof Error ? e.message : 'unknown'}`); }
+    }
   }
   L('B', 'all langs failed');
   return null;
 }
 
 // ── 取得本体 ─────────────────────────────────────────────────
+async function strategyC(videoId: string): Promise<Segment[] | null> {
+  const langs = ['en', 'ja'];
+  for (const lang of langs) {
+    try {
+      L('C', `youtube-transcript lang=${lang}`);
+      const rows = await YoutubeTranscript.fetchTranscript(videoId, { lang });
+      const segs = rows
+        .map(row => ({
+          start: row.offset / 1000,
+          duration: row.duration / 1000,
+          text: row.text.replace(/\s+/g, ' ').trim(),
+        }))
+        .filter(seg => seg.text);
+      if (segs.length > 0) {
+        L('C', `success lang=${lang}: ${segs.length} segs`);
+        return segs;
+      }
+    } catch (e) {
+      L('C', `lang=${lang} error: ${e instanceof Error ? e.message : 'unknown'}`);
+    }
+  }
+  return null;
+}
+
+async function strategyD(videoId: string): Promise<Segment[] | null> {
+  if (!FETCHTRANSCRIPT_API_KEY) {
+    L('D', 'FetchTranscript key not configured');
+    return null;
+  }
+
+  const langs = ['en', 'en-US', 'en-GB'];
+  for (const lang of langs) {
+    try {
+      L('D', `FetchTranscript lang=${lang}`);
+      const r = await fetch(
+        `https://api.fetchtranscript.com/v1/transcripts/${encodeURIComponent(videoId)}?lang=${encodeURIComponent(lang)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${FETCHTRANSCRIPT_API_KEY}`,
+            Accept: 'application/json',
+          },
+          signal: AbortSignal.timeout(T_FETCHTRANSCRIPT),
+        },
+      );
+
+      if (r.status === 401 || r.status === 403) {
+        L('D', `auth/quota HTTP ${r.status}`);
+        return null;
+      }
+      if (r.status === 429) {
+        L('D', 'rate limited');
+        return null;
+      }
+      if (!r.ok) {
+        L('D', `HTTP ${r.status}`);
+        continue;
+      }
+
+      const data = await r.json();
+      const rows = Array.isArray(data?.segments) ? data.segments : [];
+      const segs = rows
+        .map((row: any) => ({
+          start: Number(row?.start ?? 0),
+          duration: Number(row?.duration ?? 0),
+          text: String(row?.text ?? '').replace(/\s+/g, ' ').trim(),
+        }))
+        .filter((seg: Segment) => seg.text && /^[\x00-\x7F’“”–—…\s.,!?;:'"()[\]$%&+-]+$/.test(seg.text));
+
+      L('D', `FetchTranscript parsed: language=${data?.language ?? '?'} ${segs.length} segs`);
+      if (segs.length > 0) return segs;
+    } catch (e) {
+      L('D', `FetchTranscript error: ${e instanceof Error ? e.message : 'unknown'}`);
+    }
+  }
+
+  return null;
+}
+
+async function strategyE(videoId: string): Promise<Segment[] | null> {
+  const instances = ['https://inv.nadeko.net'];
+  for (const base of instances) {
+    try {
+      L('E', `captions list via ${base}`);
+      const r = await fetch(`${base}/api/v1/captions/${videoId}`, {
+        headers: { 'User-Agent': getUA(), 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(T_INV),
+      });
+      if (!r.ok) { L('E', `${base} list HTTP ${r.status}`); continue; }
+
+      const data = await r.json();
+      const captions = Array.isArray(data?.captions) ? data.captions : [];
+      const english = captions
+        .filter((c: any) => c?.url && (c.languageCode === 'en' || /English/i.test(c.label || '')))
+        .sort((a: any, b: any) => Number(/auto-generated/i.test(b.label || '')) - Number(/auto-generated/i.test(a.label || '')));
+
+      L('E', `${base} english captions: ${english.map((c: any) => c.label).join(', ') || 'none'}`);
+      for (const cap of english) {
+        try {
+          const url = cap.url.startsWith('http') ? cap.url : `${base}${cap.url}`;
+          const cr = await fetch(url, {
+            headers: { 'User-Agent': getUA(), 'Accept': 'text/vtt,text/plain,*/*' },
+            signal: AbortSignal.timeout(T_INV),
+          });
+          if (!cr.ok) { L('E', `${cap.label} HTTP ${cr.status}`); continue; }
+          const body = await cr.text();
+          const segs = parseVtt(body);
+          L('E', `${cap.label}: ${segs.length} segs`);
+          if (segs.length > 0) return segs;
+        } catch (e) {
+          L('E', `${cap.label || 'caption'} error: ${e instanceof Error ? e.message : 'unknown'}`);
+        }
+      }
+    } catch(e) {
+      LE('E', `${base} error`, e);
+    }
+  }
+  return null;
+}
+
 async function doFetch(videoId: string): Promise<Segment[] | null> {
   const cached = memGet(videoId);
   if (cached) { L('cache', `hit: ${cached.length} segs`); return cached; }
@@ -212,6 +428,18 @@ async function doFetch(videoId: string): Promise<Segment[] | null> {
 
   L('main', 'A failed → B');
   segs = await strategyB(videoId);
+  if (segs?.length) { memSet(videoId, segs); return segs; }
+
+  L('main', 'B failed -> C');
+  segs = await strategyC(videoId);
+  if (segs?.length) { memSet(videoId, segs); return segs; }
+
+  L('main', 'C failed -> D');
+  segs = await strategyD(videoId);
+  if (segs?.length) { memSet(videoId, segs); return segs; }
+
+  L('main', 'D failed -> E');
+  segs = await strategyE(videoId);
   if (segs?.length) { memSet(videoId, segs); return segs; }
 
   return null;
@@ -245,19 +473,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       L('req', `failed ${ms}ms`);
       return res.status(200).json({
         ok: false,
-        reason: '字幕が見つかりませんでした。英語字幕がないか非公開の動画です。',
+        reason: 'サーバー側で字幕を自動取得できませんでした。字幕がある動画でも、YouTube側の制限で取得できないことがあります。',
         elapsed: ms,
       });
     }
 
-    const sentences = groupToSentences(segs);
+    const timedSentences = groupToTimedSentences(segs);
+    const sentences = timedSentences.map(item => item.text);
     L('req', `success ${ms}ms: ${segs.length}segs → ${sentences.length}sents`);
 
     res.setHeader('Cache-Control','s-maxage=300,stale-while-revalidate=60');
     return res.status(200).json({
       ok:        true,
       sentences,
-      segments:  segs.slice(0,100),
+      timedSentences,
+      segments:  segs.slice(0,1200),
       count:     segs.length,
       elapsed:   ms,
     });

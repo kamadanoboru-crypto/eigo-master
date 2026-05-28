@@ -12,19 +12,22 @@
 const SB_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL  ?? '';
 const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
 const READY   = Boolean(SB_URL && SB_ANON);
+const todayJst = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date());
 
 // ── 設定値（DB取得できない場合のデフォルト）─────────────────────
 export const ECONOMY = {
-  VIDEO_EXISTING_COST:    10,
+  VIDEO_EXISTING_COST:    100,
   VIDEO_NEW_AI_COST:      100,
-  QUIZ_COST:              5,
-  GACHA_COST:             10,
+  PRACTICE_COST:          5,
+  QUIZ_COST:              10,
+  AI_CALL_COST:           5,
+  GACHA_COST:             0,
   TICKET_EXPIRE_HOURS:    24,
   DAILY_COIN_LIMIT:       200,
   FREE_QUIZ_DAILY:        3,
   FREE_LISTENING_DAILY:   3,
   FREE_GACHA_DAILY:       1,
-  MAX_EXTRA_GACHA_DAILY:  3,
+  MAX_EXTRA_GACHA_DAILY:  7,
   DECAY_MULTIPLIER:       0.8,
 };
 
@@ -44,10 +47,13 @@ async function sbGet(table: string, filter: string): Promise<Record<string,unkno
   } catch { return []; }
 }
 
-async function sbUpsert(table: string, data: Record<string,unknown> | Wallet): Promise<boolean> {
+async function sbUpsert(table: string, data: Record<string,unknown> | Wallet, onConflict?: string): Promise<boolean> {
   if (!READY) return false;
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
+    const url = onConflict
+      ? `${SB_URL}/rest/v1/${table}?on_conflict=${encodeURIComponent(onConflict)}`
+      : `${SB_URL}/rest/v1/${table}`;
+    const r = await fetch(url, {
       method: 'POST',
       headers: { ...headers(), Prefer: 'return=minimal,resolution=merge-duplicates' },
       body: JSON.stringify(data),
@@ -88,7 +94,7 @@ const defaultWallet = (userId: string): Wallet => ({
   translation_tickets: 0,
   gacha_tickets:       0,
   daily_earned_coins:  0,
-  daily_reset_date:    new Date().toISOString().split('T')[0],
+  daily_reset_date:    todayJst(),
 });
 
 // ── ウォレット取得（なければ作成）────────────────────────────
@@ -98,7 +104,7 @@ export async function getWallet(userId: string): Promise<Wallet> {
   if (rows.length) {
     const w = rows[0] as unknown as Wallet;
     // デイリーリセット確認
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayJst();
     if (w.daily_reset_date !== today) {
       w.daily_earned_coins = 0;
       w.daily_reset_date   = today;
@@ -121,7 +127,7 @@ export async function addCoins(
   opts: { decay?: boolean } = {},
 ): Promise<{ added: number; total: number; limitReached: boolean }> {
   const wallet = await getWallet(userId);
-  const today  = new Date().toISOString().split('T')[0];
+  const today  = todayJst();
 
   // デイリーリセット
   const dailyEarned = wallet.daily_reset_date === today ? wallet.daily_earned_coins : 0;
@@ -167,6 +173,16 @@ export async function spendCoins(
   return { ok: true, remaining: newCoins };
 }
 
+export async function refundCoins(
+  userId: string,
+  amount: number,
+): Promise<{ ok: boolean; total: number }> {
+  const wallet = await getWallet(userId);
+  const total = wallet.coins + Math.max(0, Number(amount) || 0);
+  const ok = await sbUpsert('user_wallet', { user_id: userId, coins: total, updated_at: new Date().toISOString() });
+  return { ok, total };
+}
+
 // ── チケット消費 ──────────────────────────────────────────────
 type TicketType = 'video_tickets' | 'quiz_tickets' | 'translation_tickets' | 'gacha_tickets';
 
@@ -180,6 +196,28 @@ export async function spendTicket(
   const newVal = current - 1;
   await sbUpsert('user_wallet', { user_id: userId, [ticketType]: newVal });
   return { ok: true, remaining: newVal };
+}
+
+export async function addTicketToWallet(
+  userId: string,
+  rewardType: string,
+  amount: number,
+): Promise<boolean> {
+  const colMap: Record<string, TicketType> = {
+    quiz_ticket:        'quiz_tickets',
+    video_ticket:       'video_tickets',
+    translation_ticket: 'translation_tickets',
+    gacha_ticket:       'gacha_tickets',
+  };
+  const col = colMap[rewardType];
+  if (!col) return false;
+  const wallet = await getWallet(userId);
+  const current = Number((wallet as any)[col] ?? 0);
+  return sbUpsert('user_wallet', {
+    user_id: userId,
+    [col]: Math.max(0, current + amount),
+    updated_at: new Date().toISOString(),
+  });
 }
 
 // ── コンテンツ解放チェック ────────────────────────────────────
@@ -230,7 +268,7 @@ export async function recordUnlock(opts: {
     coins_spent:  coinsSpent,
     unlocked_at:  new Date().toISOString(),
     expires_at:   expiresAt,
-  });
+  }, 'user_id,content_type,content_id');
 }
 
 // ── デイリー報酬取得 ──────────────────────────────────────────
@@ -242,7 +280,7 @@ export interface DailyReward {
 }
 
 export async function getDailyReward(userId: string): Promise<DailyReward> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayJst();
   if (!READY) return { free_gacha_used: 0, extra_gacha_count: 0, quiz_free_used: 0, listening_free_used: 0 };
   const rows = await sbGet('daily_rewards', `user_id=eq.${encodeURIComponent(userId)}&reward_date=eq.${today}&limit=1`);
   if (rows.length) return rows[0] as unknown as DailyReward;
@@ -253,8 +291,8 @@ export async function updateDailyReward(
   userId: string,
   patch: Partial<DailyReward>,
 ): Promise<void> {
-  const today = new Date().toISOString().split('T')[0];
-  await sbUpsert('daily_rewards', { user_id: userId, reward_date: today, ...patch });
+  const today = todayJst();
+  await sbUpsert('daily_rewards', { user_id: userId, reward_date: today, ...patch }, 'user_id,reward_date');
 }
 
 // ── ガチャ抽選（weight管理）──────────────────────────────────
@@ -266,17 +304,11 @@ interface GachaReward {
 }
 
 const LOCAL_GACHA_TABLE: GachaReward[] = [
-  { reward_type:'coin',               reward_key:'coins_5',              reward_value:5,   weight:200 },
-  { reward_type:'coin',               reward_key:'coins_10',             reward_value:10,  weight:180 },
-  { reward_type:'coin',               reward_key:'coins_20',             reward_value:20,  weight:120 },
-  { reward_type:'coin',               reward_key:'coins_50',             reward_value:50,  weight:50  },
-  { reward_type:'coin',               reward_key:'coins_100',            reward_value:100, weight:20  },
-  { reward_type:'quiz_ticket',        reward_key:'quiz_ticket_1',        reward_value:1,   weight:150 },
-  { reward_type:'quiz_ticket',        reward_key:'quiz_ticket_3',        reward_value:3,   weight:60  },
-  { reward_type:'video_ticket',       reward_key:'video_ticket_1',       reward_value:1,   weight:80  },
-  { reward_type:'translation_ticket', reward_key:'translation_ticket_1', reward_value:1,   weight:70  },
-  { reward_type:'gacha_ticket',       reward_key:'gacha_ticket_1',       reward_value:1,   weight:60  },
-  { reward_type:'gacha_ticket',       reward_key:'gacha_ticket_3',       reward_value:3,   weight:10  },
+  { reward_type:'coin', reward_key:'coins_50', reward_value:50, weight:3  },
+  { reward_type:'coin', reward_key:'coins_30', reward_value:30, weight:10 },
+  { reward_type:'coin', reward_key:'coins_20', reward_value:20, weight:20 },
+  { reward_type:'coin', reward_key:'coins_10', reward_value:10, weight:30 },
+  { reward_type:'coin', reward_key:'coins_5',  reward_value:5,  weight:37 },
 ];
 
 export async function drawGacha(opts: {
@@ -285,12 +317,9 @@ export async function drawGacha(opts: {
 }): Promise<GachaReward & { emoji: string; text: string }> {
   // DB からガチャテーブルを取得（失敗時はローカル）
   let table = LOCAL_GACHA_TABLE;
-  if (READY) {
-    const rows = await sbGet('gacha_rewards', 'is_active=eq.true');
-    if (rows.length) table = rows as unknown as GachaReward[];
-  }
+  // Keep payout balance in code. Old DB reward rows are intentionally ignored.
 
-  // インフレ対策: coins_50 以上を連続排出しない
+  // インフレ対策: 高額コインを連続排出しにくくする
   let finalTable = table;
   if (opts.lastRewardType === 'coin') {
     finalTable = table.map(r =>
@@ -310,7 +339,7 @@ export async function drawGacha(opts: {
   }
 
   const EMOJI: Record<string, string> = {
-    coin: prize.reward_value >= 50 ? '💎' : prize.reward_value >= 20 ? '🌟' : prize.reward_value >= 10 ? '✨' : '⭐',
+    coin: prize.reward_value >= 50 ? '◆' : prize.reward_value >= 20 ? '✦' : prize.reward_value >= 10 ? '•' : '·',
     quiz_ticket:        '📝',
     video_ticket:       '🎬',
     translation_ticket: '🌐',

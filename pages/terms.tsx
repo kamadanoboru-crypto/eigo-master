@@ -1,4 +1,4 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import Link from 'next/link';
 import styles from './pages.module.css';
 
@@ -6,32 +6,32 @@ export default function Terms() {
   return (
     <>
       <Head>
-        <title>利用規約 | 英語マスター</title>
-        <meta name="description" content="英語マスターの利用規約です。サービス利用にあたってのルールをご確認ください。" />
+        <title>利用規約 | English Base</title>
+        <meta name="description" content="English Baseの利用規約です。サービス利用にあたってのルールをご確認ください。" />
       </Head>
       <div className={styles.container}>
         <header className={styles.header}>
           <Link href="/">
-            <a className={styles.logo}>🎓 英語マスター</a>
+            <a className={styles.logo}>🎓 English Base</a>
           </Link>
         </header>
 
         <main className={styles.main}>
           <article className={styles.article}>
             <h1>利用規約</h1>
-            <p className={styles.lastUpdate}>最終更新日：2025年5月</p>
+            <p className={styles.lastUpdate}>最終更新日：2026年5月</p>
 
             <section>
               <h2>1. 本規約の適用</h2>
               <p>
-                本規約は、「英語マスター」（以下「本アプリ」）の利用にあたり、ユーザーが同意すべき条件を定めています。本アプリを利用することで、本規約に同意したものと見なされます。
+                本規約は、「English Base」（以下「本アプリ」）の利用にあたり、ユーザーが同意すべき条件を定めています。本アプリを利用することで、本規約に同意したものと見なされます。
               </p>
             </section>
 
             <section>
               <h2>2. サービスの内容</h2>
               <p>
-                本アプリは、YouTube動画やBBCニュースを活用した英語学習支援サービスを提供しています。サービス内容は予告なく変更されることがあります。
+                本アプリは、YouTube動画やBBCニュースを活用した英語学習支援、AI翻訳、AI学習アドバイス、おすすめ学習サイトへの導線を提供しています。サービス内容は予告なく変更されることがあります。
               </p>
             </section>
 
@@ -64,6 +64,16 @@ export default function Terms() {
               <h3>4.3 AI生成コンテンツ</h3>
               <p>
                 本アプリが提供する字幕・翻訳・文法説明はAIによって生成されたものです。その正確性は保証されません。
+              </p>
+              <p>
+                AI生成結果は学習補助とコスト削減のため保存・再利用される場合があります。
+              </p>
+            </section>
+
+            <section>
+              <h2>4.4 広告・アフィリエイトについて</h2>
+              <p>
+                本アプリには広告およびアフィリエイトリンクが含まれる場合があります。リンク先の商品・サービスの契約、料金、品質等については各提供事業者の条件をご確認ください。
               </p>
             </section>
 
@@ -130,7 +140,7 @@ export default function Terms() {
             <section>
               <h2>9. 個人情報の取り扱い</h2>
               <p>
-                個人情報の取り扱いについては、<Link href="/privacy-policy">プライバシーポリシー</Link>をご参照ください。
+                個人情報の取り扱いについては、<Link href="/privacy">プライバシーポリシー</Link>をご参照ください。
               </p>
             </section>
 
@@ -161,10 +171,10 @@ export default function Terms() {
           <div className={styles.footerLinks}>
             <Link href="/">ホーム</Link>
             <Link href="/about">について</Link>
-            <Link href="/privacy-policy">プライバシーポリシー</Link>
+            <Link href="/privacy">プライバシーポリシー</Link>
             <Link href="/contact">お問い合わせ</Link>
           </div>
-          <p>&copy; 2025 英語マスター. All rights reserved.</p>
+          <p>&copy; 2025 English Base. All rights reserved.</p>
         </footer>
       </div>
     </>

@@ -1,187 +1,272 @@
-/**
- * POST /api/quiz/generate
- *
- * フロー:
- *  1. cache_key 生成
- *  2. quiz_cache を確認（HIT → 即返す）
- *  3. MISS → AI生成（Groq→Cohere→Gemini→OpenAI→Dummy）
- *  4. DB に UPSERT 保存
- *  5. 返却
- *
- * Body: { quizType, sourceType, sourceId?, level?, setNum?, count?, savedLines?, userId?, forceRegen? }
- * Response: { questions, cacheKey, fromCache }
- */
-
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { callAI, parseJSON }          from '../../../lib/aiClient';
+import { callAI, parseJSON } from '../../../lib/aiClient';
 import { buildCacheKey, getCachedQuiz, saveCachedQuiz } from '../../../lib/quizCache';
-import type { QuizQuestion }          from '../../../types';
+import type { QuizQuestion } from '../../../types';
 
-// ── ダミーデータ（全AI失敗時・env未設定時のフォールバック）──
-const DUMMY_WORDS: QuizQuestion[] = [
-  {word:'allocate',     meaning:'割り当てる', pos:'動詞',   options:['割り当てる','取得する','実施する','促進する'],   correct:'割り当てる'},
-  {word:'acquire',      meaning:'取得する',   pos:'動詞',   options:['取得する','割り当てる','交渉する','承認する'],   correct:'取得する'},
-  {word:'implement',    meaning:'実施する',   pos:'動詞',   options:['実施する','促進する','従う','精査する'],         correct:'実施する'},
-  {word:'facilitate',   meaning:'促進する',   pos:'動詞',   options:['促進する','実施する','協力する','取得する'],     correct:'促進する'},
-  {word:'negotiate',    meaning:'交渉する',   pos:'動詞',   options:['交渉する','承認する','悪化する','払い戻す'],     correct:'交渉する'},
-  {word:'comprehensive',meaning:'包括的な',   pos:'形容詞', options:['包括的な','効率的な','相当な','義務的な'],      correct:'包括的な'},
-  {word:'mandatory',    meaning:'義務的な',   pos:'形容詞', options:['義務的な','相当な','連続した','熟練した'],      correct:'義務的な'},
-  {word:'revenue',      meaning:'収益',       pos:'名詞',   options:['収益','支出','在庫','修正'],                    correct:'収益'},
-  {word:'momentum',     meaning:'勢い',       pos:'名詞',   options:['勢い','主導権','収益','支出'],                  correct:'勢い'},
-  {word:'efficient',    meaning:'効率的な',   pos:'形容詞', options:['効率的な','包括的な','暫定的な','隣接した'],    correct:'効率的な'},
-];
-const DUMMY_GRAMMAR: QuizQuestion[] = [
-  {s:'The meeting has been _____ until next Friday.', options:['postponed','postponing','postpone','postponement'], ans:'postponed', correct:'postponed', exp:'受動態の完了形：has been + 過去分詞。', cat:'受動態'},
-  {s:'The report must be submitted _____ Friday.',    options:['by','until','since','for'],                        ans:'by',        correct:'by',        exp:'by = 期限（〜までに）。',              cat:'前置詞'},
-  {s:'Employees are required to _____ time sheets.', options:['submit','submitting','submitted','submission'],    ans:'submit',    correct:'submit',    exp:'to不定詞の後は動詞の原形。',           cat:'動詞の形'},
-  {s:'The manager is responsible _____ the team.',   options:['for','of','to','at'],                              ans:'for',       correct:'for',       exp:'be responsible for が重要表現。',     cat:'前置詞'},
-  {s:'Sales figures _____ significantly this year.', options:['have risen','are risen','risen','rising'],         ans:'have risen',correct:'have risen', exp:'現在完了形：have + 過去分詞。',        cat:'時制'},
-  {s:'_____ the budget cuts, the project continued.',options:['Despite','Although','However','Because'],          ans:'Despite',   correct:'Despite',   exp:'Despite（前置詞）は名詞句を伴う。',    cat:'前置詞・接続詞'},
-  {s:'Please contact us _____ you have questions.',  options:['if','unless','despite','while'],                   ans:'if',        correct:'if',        exp:'if が条件節を導く。',                  cat:'条件節'},
-  {s:'The new policy will take _____ on April 1st.', options:['effect','affect','effort','efficiency'],           ans:'effect',    correct:'effect',    exp:'take effect（発効する）は重要熟語。',  cat:'語彙・熟語'},
-  {s:'_____ staff attended the seminar voluntarily.',options:['Most','Almost','Mostly','The most'],               ans:'Most',      correct:'Most',      exp:'Most は形容詞として名詞を直接修飾。', cat:'形容詞・副詞'},
-  {s:'The CEO announced the company would _____ staff.',options:['hire','hiring','hired','hires'],                ans:'hire',      correct:'hire',      exp:'would の後は動詞の原形。',            cat:'時制・話法'},
+const WORDS: QuizQuestion[] = [
+  { word: 'allocate', meaning: '割り当てる', pos: '動詞' },
+  { word: 'acquire', meaning: '獲得する', pos: '動詞' },
+  { word: 'implement', meaning: '実施する', pos: '動詞' },
+  { word: 'facilitate', meaning: '促進する', pos: '動詞' },
+  { word: 'negotiate', meaning: '交渉する', pos: '動詞' },
+  { word: 'comprehensive', meaning: '包括的な', pos: '形容詞' },
+  { word: 'efficient', meaning: '効率的な', pos: '形容詞' },
+  { word: 'mandatory', meaning: '必須の', pos: '形容詞' },
+  { word: 'revenue', meaning: '収益', pos: '名詞' },
+  { word: 'inventory', meaning: '在庫', pos: '名詞' },
+  { word: 'momentum', meaning: '勢い', pos: '名詞' },
+  { word: 'consecutive', meaning: '連続した', pos: '形容詞' },
 ];
 
-const shuffle = <T>(a: T[]): T[] => [...a].sort(() => Math.random() - 0.5);
+const GRAMMAR: QuizQuestion[] = [
+  { s: 'The meeting has been _____ until next Friday.', options: ['postponed', 'postponing', 'postpone', 'postponement'], ans: 'postponed', correct: 'postponed', exp: '受け身の現在完了なので has been + 過去分詞を使います。', cat: '受動態' },
+  { s: 'The report must be submitted _____ Friday.', options: ['by', 'until', 'since', 'for'], ans: 'by', correct: 'by', exp: '締切を表す「〜までに」は by を使います。', cat: '前置詞' },
+  { s: 'Employees are required to _____ time sheets.', options: ['submit', 'submitting', 'submitted', 'submission'], ans: 'submit', correct: 'submit', exp: 'be required to の後は動詞の原形です。', cat: '動詞の形' },
+  { s: 'The manager is responsible _____ the team.', options: ['for', 'of', 'to', 'at'], ans: 'for', correct: 'for', exp: 'be responsible for は「〜に責任がある」という表現です。', cat: '前置詞' },
+  { s: 'Sales figures _____ significantly this year.', options: ['have risen', 'are risen', 'risen', 'rising'], ans: 'have risen', correct: 'have risen', exp: 'this year は現在完了と相性がよく、rise の過去分詞は risen です。', cat: '時制' },
+  { s: '_____ the budget cuts, the project continued.', options: ['Despite', 'Although', 'However', 'Because'], ans: 'Despite', correct: 'Despite', exp: 'Despite は前置詞で、後ろに名詞句を置けます。', cat: '接続表現' },
+  { s: 'Please contact us _____ you have questions.', options: ['if', 'unless', 'despite', 'while'], ans: 'if', correct: 'if', exp: '条件を表す「もし〜なら」は if です。', cat: '条件' },
+  { s: 'The new policy will take _____ on April 1st.', options: ['effect', 'affect', 'effort', 'efficiency'], ans: 'effect', correct: 'effect', exp: 'take effect は「発効する」という定型表現です。', cat: '語彙' },
+];
 
-function dummyWord(n: number):      QuizQuestion[] { return shuffle(DUMMY_WORDS).slice(0, n); }
-function dummyGrammar(n: number):   QuizQuestion[] { return shuffle(DUMMY_GRAMMAR).slice(0, n); }
-function dummyListening(n: number): QuizQuestion[] {
-  return dummyWord(n).map(w => ({
-    en: `The word "${w.word}" means ${w.meaning}.`,
-    jp: `「${w.word}」は${w.meaning}という意味です。`,
-    options: shuffle([`「${w.word}」は${w.meaning}という意味です。`, '別の意味1', '別の意味2', '別の意味3']),
-    correct: `「${w.word}」は${w.meaning}という意味です。`,
-  }));
+const shuffle = <T>(items: T[]): T[] => [...items].sort(() => Math.random() - 0.5);
+const shuffleQuestionOptions = (q: QuizQuestion): QuizQuestion => {
+  const options = Array.isArray(q.options)
+    ? q.options
+    : Array.isArray((q as any).opts)
+      ? (q as any).opts
+      : null;
+  if (!options?.length) return q;
+  const shuffled: string[] = shuffle<string>(options.map(String));
+  return {
+    ...(q as any),
+    options: shuffled,
+    ...(Array.isArray((q as any).opts) ? { opts: shuffled } : {}),
+  } as QuizQuestion;
+};
+
+function wordQuestions(count: number): QuizQuestion[] {
+  return shuffle(WORDS).slice(0, count).map(w => {
+    const distractors = shuffle(WORDS.filter(x => x.meaning !== w.meaning)).slice(0, 3).map(x => x.meaning!);
+    return {
+      ...w,
+      options: shuffle([w.meaning!, ...distractors]),
+      correct: w.meaning,
+    };
+  });
 }
 
-// ── AI プロンプト生成 ─────────────────────────────────────────
+function grammarQuestions(count: number): QuizQuestion[] {
+  return shuffle(GRAMMAR).slice(0, count);
+}
+
+function grammarJapanese(sentence: string, correct: string): string {
+  const filled = sentence.replace('_____', correct);
+  const known: Record<string, string> = {
+    'The meeting has been postponed until next Friday.': '会議は来週金曜日まで延期されました。',
+    'The report must be submitted by Friday.': '報告書は金曜日までに提出されなければなりません。',
+    'Employees are required to submit time sheets.': '従業員は勤務表を提出する必要があります。',
+    'The manager is responsible for the team.': 'そのマネージャーはチームに責任があります。',
+    'Sales figures have risen significantly this year.': '今年、売上数値は大きく上昇しました。',
+    'Despite the budget cuts, the project continued.': '予算削減にもかかわらず、そのプロジェクトは継続しました。',
+    'Please contact us if you have questions.': '質問がある場合は、私たちに連絡してください。',
+    'The new policy will take effect on April 1st.': '新しい方針は4月1日に発効します。',
+  };
+  return known[filled] ?? `「${filled}」という意味です。`;
+}
+
+function normalizeGrammarQuestion(q: QuizQuestion): QuizQuestion | null {
+  const sentence = String(q.s ?? '').trim();
+  const options = Array.isArray(q.options)
+    ? q.options.map(String).map(s => s.trim()).filter(Boolean)
+    : Array.isArray((q as any).opts)
+      ? (q as any).opts.map(String).map((s: string) => s.trim()).filter(Boolean)
+      : [];
+  const correct = String(q.correct ?? q.ans ?? '').trim();
+
+  if (!sentence.includes('_____')) return null;
+  if (options.length !== 4) return null;
+  if (!correct || !options.includes(correct)) return null;
+
+  const ja = String((q as any).ja ?? (q as any).jp ?? '').trim() || grammarJapanese(sentence, correct);
+
+  return {
+    ...q,
+    s: sentence,
+    ja,
+    options,
+    ans: correct,
+    correct,
+    exp: q.exp || '正解の語句が文法・語法上もっとも自然です。',
+    cat: q.cat || 'TOEIC Part 5',
+  } as QuizQuestion;
+}
+
+function normalizeGrammarSet(items: QuizQuestion[], count: number): QuizQuestion[] {
+  const seen = new Set<string>();
+  const valid: QuizQuestion[] = [];
+  for (const item of items) {
+    const q = normalizeGrammarQuestion(item);
+    if (!q || seen.has(q.s ?? '')) continue;
+    seen.add(q.s ?? '');
+    valid.push(q);
+    if (valid.length >= count) break;
+  }
+  return valid;
+}
+
+function listeningQuestions(count: number): QuizQuestion[] {
+  return wordQuestions(count).map(w => {
+    const correct = `「${w.word}」は「${w.meaning}」という意味です。`;
+    return {
+      en: `The word "${w.word}" means "${w.meaning}" in Japanese.`,
+      jp: correct,
+      options: shuffle([correct, '会議は来週に延期されました。', '報告書を金曜日までに提出してください。', '売上は今年大きく伸びました。']),
+      correct,
+    };
+  });
+}
+
+function fallbackQuestions(quizType: string, count: number): QuizQuestion[] {
+  if (quizType === 'grammar') return normalizeGrammarSet(grammarQuestions(count), count);
+  if (quizType === 'listening') return listeningQuestions(count);
+  return wordQuestions(count);
+}
+
 function buildPrompt(
   quizType: string,
   level: string,
   count: number,
   savedLines: { english?: string }[],
 ): string {
-  const lvMap: Record<string, string> = {
-    level_300: 'TOEIC 300点（初級）',
-    level_600: 'TOEIC 600点（中級）',
-    level_800: 'TOEIC 800点（上級）',
+  const levelLabel: Record<string, string> = {
+    level_300: 'TOEIC 300点程度の初級',
+    level_600: 'TOEIC 600点程度の中級',
+    level_800: 'TOEIC 800点程度の上級',
   };
-  const lvLabel = lvMap[level] ?? 'TOEIC 600点（中級）';
-  // 必ず english フィールドのみを使用（日本語訳は使わない）
-  const sents = savedLines
+  const sourceText = savedLines
     .slice(0, 15)
-    .map(l => l.english)
-    .filter((s): s is string => typeof s === 'string' && s.trim().length > 4)
+    .map(line => line.english)
+    .filter((text): text is string => typeof text === 'string' && text.trim().length > 4)
     .join('\n');
+  const sourceBlock = sourceText ? `\n参考英文:\n${sourceText}\n` : '';
+  const levelText = levelLabel[level] ?? levelLabel.level_600;
 
-  if (quizType === 'word') {
-    return `${sents ? `以下の英文から重要な英単語を${count}個選び` : `${lvLabel}のTOEIC頻出英単語を${count}個選び`}、英語→日本語の4択問題を生成してください。
-問題文は必ず英語の単語にしてください。日本語を問題文にしないでください。${sents ? `\n英文:\n${sents}` : ''}
-JSON配列のみ返してください（他の文字は一切不要）:
-[{"word":"英単語","meaning":"日本語の意味","pos":"品詞","options":["正解の日本語","誤答1","誤答2","誤答3"],"correct":"正解の日本語と同じ文字列"}]
-optionsは必ずランダム順にすること。wordフィールドは必ず英語にすること。`;
-  }
   if (quizType === 'grammar') {
-    return `${sents ? `以下の英文を参考に${lvLabel}のPart5英語穴埋め問題を${count}問` : `${lvLabel}のTOEIC Part5英語穴埋め問題を${count}問`}生成してください。
-問題文（sフィールド）は必ず英語の文にし、_____で空欄を示してください。選択肢も必ず英語にしてください。${sents ? `\n参考英文:\n${sents}` : ''}
-JSON配列のみ返してください:
-[{"s":"English sentence with _____","options":["correct","wrong1","wrong2","wrong3"],"ans":"correct","exp":"解説（日本語可）","cat":"カテゴリ","correct":"ansと同じ"}]`;
+    return `${levelText}の英語学習者向けに、TOEIC Part 5形式の空所補充問題を${count}問作ってください。${sourceBlock}
+JSON配列だけを返してください。
+形式:
+[{"s":"English sentence with _____","ja":"問題文全体の自然な日本語訳","options":["correct","wrong1","wrong2","wrong3"],"ans":"correct","correct":"correct","exp":"日本語の解説","cat":"カテゴリ"}]`;
   }
+
   if (quizType === 'listening') {
-    const lines = sents.split('\n').filter(Boolean).slice(0, count);
-    return `${lines.length >= 3
-      ? `以下の英文について、正しい日本語訳と誤答3つを生成してください。\n英文:\n${lines.join('\n')}`
-      : `${lvLabel}の英語ビジネス表現を${count}文作り、それぞれの正しい日本語訳と誤答3つを生成してください。enフィールドは必ず英語にすること。`}
-JSON配列のみ返してください:
-[{"en":"英文（必ず英語）","jp":"正しい日本語訳","distractors":["誤1","誤2","誤3"]}]`;
+    return `${levelText}の英語学習者向けに、短い英文を聞いて意味を選ぶリスニング問題を${count}問作ってください。${sourceBlock}
+JSON配列だけを返してください。
+形式:
+[{"en":"English sentence","jp":"正しい日本語訳","distractors":["誤訳1","誤訳2","誤訳3"]}]`;
   }
-  return `${lvLabel}の英語問題を${count}問生成してください。JSONのみ返してください。`;
+
+  return `${levelText}の英語学習者向けに、英単語の意味を選ぶ4択問題を${count}問作ってください。${sourceBlock}
+JSON配列だけを返してください。
+形式:
+[{"word":"English word","meaning":"日本語の意味","pos":"品詞","options":["正解","誤答1","誤答2","誤答3"],"correct":"正解"}]`;
 }
 
-// ── リスニング後処理 ─────────────────────────────────────────
 function toListening(raw: { en?: string; jp?: string; distractors?: string[] }[]): QuizQuestion[] {
-  return raw.map(item => ({
-    en:      item.en ?? '',
-    jp:      item.jp ?? '',
-    options: shuffle([item.jp ?? '', ...(item.distractors ?? ['誤1','誤2','誤3'])]),
-    correct: item.jp ?? '',
-  }));
+  return raw
+    .filter(item => item.en && item.jp)
+    .map(item => ({
+      en: item.en ?? '',
+      jp: item.jp ?? '',
+      options: shuffle([item.jp ?? '', ...(item.distractors ?? []).slice(0, 3)]),
+      correct: item.jp ?? '',
+    }));
 }
 
-// ── Handler ───────────────────────────────────────────────────
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const {
-    quizType   = 'word',
+    quizType = 'word',
     sourceType = 'toeic',
-    sourceId   = '',
-    level      = 'level_600',
-    setNum     = 1,
-    count      = 10,
+    sourceId = '',
+    level = 'level_600',
+    setNum = 1,
+    count = 10,
     savedLines = [],
     userId,
     forceRegen = false,
   } = (req.body ?? {}) as {
-    quizType?:   string;
+    quizType?: string;
     sourceType?: string;
-    sourceId?:   string;
-    level?:      string;
-    setNum?:     number;
-    count?:      number;
+    sourceId?: string;
+    level?: string;
+    setNum?: number;
+    count?: number;
     savedLines?: { english?: string }[];
-    userId?:     string;
+    userId?: string;
     forceRegen?: boolean;
   };
 
+  const safeCount = Math.min(Math.max(Number(count) || 10, 1), 20);
   const cacheKey = buildCacheKey({ quizType, sourceType, sourceId, level, setNum });
-  console.log(`[quiz/generate] ${cacheKey}`);
 
-  // ── STEP 1: キャッシュ確認 ────────────────────────────────
   if (!forceRegen) {
     const cached = await getCachedQuiz(cacheKey);
     if (cached?.data?.length) {
-      const qs = shuffle(cached.data as QuizQuestion[]).slice(0, count);
-      console.log(`[quiz/generate] CACHE HIT (${qs.length}問)`);
-      return res.status(200).json({ questions: qs, cacheKey, fromCache: true });
+      const cachedQuestions = quizType === 'grammar'
+        ? normalizeGrammarSet(cached.data as QuizQuestion[], safeCount)
+        : cached.data as QuizQuestion[];
+      if (quizType === 'grammar' && cachedQuestions.length < safeCount) {
+        console.warn(`[quiz/generate] invalid grammar cache ignored: ${cacheKey}`);
+      } else {
+      return res.status(200).json({
+        questions: shuffle(cachedQuestions).slice(0, safeCount).map(shuffleQuestionOptions),
+        cacheKey,
+        fromCache: true,
+      });
+      }
     }
   }
-  console.log(`[quiz/generate] CACHE MISS → AI生成`);
 
-  // ── STEP 2: AI生成 ────────────────────────────────────────
   let questions: QuizQuestion[] = [];
-
   try {
-    const prompt = buildPrompt(quizType, level, count, savedLines);
-    const raw    = await callAI(prompt, 1500);
+    const prompt = buildPrompt(quizType, level, safeCount, savedLines);
+    const system = 'You are an English quiz generator for Japanese learners. Return valid JSON only.';
+    const raw = await callAI(prompt, 1800, system);
 
     if (quizType === 'listening') {
-      const arr = parseJSON<{ en?: string; jp?: string; distractors?: string[] }[]>(raw, []);
-      questions = arr.length ? toListening(arr) : dummyListening(count);
+      questions = toListening(parseJSON<{ en?: string; jp?: string; distractors?: string[] }[]>(raw, []));
     } else {
-      const arr = parseJSON<QuizQuestion[]>(raw, []);
-      questions = arr.length ? arr : (quizType === 'word' ? dummyWord(count) : dummyGrammar(count));
+      questions = parseJSON<QuizQuestion[]>(raw, []);
     }
 
-    // correct フィールドの正規化
-    questions = questions.map(q => ({ ...q, correct: q.correct ?? q.ans ?? '' }));
-
+    questions = questions
+      .filter(q => q && (q.word || q.s || q.en))
+      .map(q => ({ ...q, correct: q.correct ?? q.ans ?? q.meaning ?? '' }));
+    if (quizType === 'grammar') {
+      questions = normalizeGrammarSet(questions, safeCount);
+    }
   } catch (err) {
-    console.error('[quiz/generate] AI失敗 → ダミー使用:', err instanceof Error ? err.message : err);
-    questions = quizType === 'word'
-      ? dummyWord(count)
-      : quizType === 'grammar'
-      ? dummyGrammar(count)
-      : dummyListening(count);
+    console.error('[quiz/generate] AI failed:', err instanceof Error ? err.message : err);
   }
 
-  // ── STEP 3: DB UPSERT 保存（失敗しても返却は続ける）────────
-  if (questions.length > 0) {
-    saveCachedQuiz({ cacheKey, quizType, sourceType, sourceId, level, data: questions, createdBy: userId })
-      .catch(e => console.error('[quiz/generate] DB保存失敗:', e));
+  if (!questions.length) {
+    questions = fallbackQuestions(quizType, safeCount);
+  } else if (quizType === 'grammar' && questions.length < safeCount) {
+    questions = [
+      ...questions,
+      ...normalizeGrammarSet(grammarQuestions(safeCount), safeCount)
+        .filter(q => !questions.some(existing => existing.s === q.s)),
+    ].slice(0, safeCount);
   }
 
-  return res.status(200).json({ questions: questions.slice(0, count), cacheKey, fromCache: false });
+  saveCachedQuiz({ cacheKey, quizType, sourceType, sourceId, level, data: questions, createdBy: userId })
+    .catch(e => console.error('[quiz/generate] cache save failed', e));
+
+  return res.status(200).json({
+    questions: questions.slice(0, safeCount).map(shuffleQuestionOptions),
+    cacheKey,
+    fromCache: false,
+  });
 }

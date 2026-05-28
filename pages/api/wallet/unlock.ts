@@ -38,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const cost = contentType === 'video'
         ? (isNewAI ? ECONOMY.VIDEO_NEW_AI_COST : ECONOMY.VIDEO_EXISTING_COST)
         : contentType === 'quiz' ? ECONOMY.QUIZ_COST
-        : 10;
+        : ECONOMY.AI_CALL_COST;
 
       const { ok, remaining, message } = await spendCoins(userId, cost);
       if (!ok) return res.status(400).json({ ok: false, message, remaining });

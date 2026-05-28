@@ -37,7 +37,7 @@ interface SbClient {
   select: (filter?: FilterString) => Promise<Record<string, unknown>[]>;
   insert: (data: unknown)         => Promise<Record<string, unknown>[] | null>;
   delete: (filter: FilterString)  => Promise<void>;
-  upsert: (data: unknown)         => Promise<Record<string, unknown>[] | null>;
+  upsert: (data: unknown, onConflict?: string) => Promise<Record<string, unknown>[] | null>;
 }
 
 const NOOP: SbClient = {
@@ -60,7 +60,14 @@ export function sbFrom(table: string): SbClient {
   return {
     select: async (filter = '') => {
       try {
-        const r = await fetch(`${base}?${filter}`, {
+        const query = filter.startsWith('select=')
+          ? filter
+          : filter.startsWith('*&')
+            ? `select=${filter}`
+            : filter
+              ? `select=*&${filter}`
+              : 'select=*';
+        const r = await fetch(`${base}?${query}`, {
           headers: { ...headers, Prefer: 'return=representation' },
         });
         if (!r.ok) { console.error(`[sb] SELECT ${table} ${r.status}`); return []; }
@@ -95,9 +102,10 @@ export function sbFrom(table: string): SbClient {
       }
     },
 
-    upsert: async (data) => {
+    upsert: async (data, onConflict) => {
       try {
-        const r = await fetch(base, {
+        const url = onConflict ? `${base}?on_conflict=${encodeURIComponent(onConflict)}` : base;
+        const r = await fetch(url, {
           method: 'POST',
           headers: { ...headers, Prefer: 'return=representation,resolution=merge-duplicates' },
           body: JSON.stringify(data),

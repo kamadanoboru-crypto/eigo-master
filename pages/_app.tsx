@@ -1,4 +1,4 @@
-import type { AppProps } from 'next/app';
+﻿import type { AppProps } from 'next/app';
 import Head from 'next/head';
 import './globals.css';
 
@@ -12,10 +12,10 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="description" content="YouTube動画・BBCニュースで英語を語順のまま理解する学習アプリ" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="英語マスター" />
+        <meta name="apple-mobile-web-app-title" content="English Base" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-        <title>英語マスター</title>
+        <title>English Base</title>
       </Head>
 
       <Component {...pageProps} />

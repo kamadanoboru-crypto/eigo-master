@@ -28,7 +28,7 @@ export default async function handler(
 
   try {
     const r = await fetch(url, {
-      headers: { 'User-Agent': 'EigoMaster/1.0 (educational)' },
+      headers: { 'User-Agent': 'EnglishBase/1.0 (educational)' },
       signal: AbortSignal.timeout(8000),
     });
     if (!r.ok) throw new Error(`BBC HTTP ${r.status}`);

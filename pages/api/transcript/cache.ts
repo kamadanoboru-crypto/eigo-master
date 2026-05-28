@@ -3,7 +3,7 @@
  * /api/transcript/cache
  *
  * GET  ?videoId=xxx  → キャッシュ取得 (ヒットしたら { ok:true, hit:true, ... })
- * POST body: { videoId, segments, sentences } → キャッシュ保存
+ * POST body: { videoId, segments, sentences, timedSentences? } → キャッシュ保存
  *
  * キャッシュTTL: 7日間
  * Supabaseが未設定の場合はスキップ（{ ok:false, reason:'no-supabase' }）
@@ -31,6 +31,15 @@ async function sbRpc(method: string, path: string, body?: unknown) {
   return r;
 }
 
+async function readError(r: Response): Promise<string> {
+  try {
+    const text = await r.text();
+    return text.slice(0, 300);
+  } catch {
+    return '';
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!SB_READY) return res.status(200).json({ ok: false, reason: 'no-supabase' });
 
@@ -40,8 +49,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!videoId) return res.status(400).json({ ok: false, reason: 'missing videoId' });
 
     try {
-      const r = await sbRpc('GET', `transcript_cache?video_id=eq.${videoId}&select=segments,sentences,fetched_at`);
-      if (!r.ok) return res.status(200).json({ ok: false, reason: `db error ${r.status}` });
+      let r = await sbRpc('GET', `transcript_cache?select=segments,sentences,timed_sentences,fetched_at&video_id=eq.${encodeURIComponent(videoId)}`);
+      let hasTimedColumn = true;
+      if (!r.ok) {
+        const err = await readError(r);
+        if (err.includes('timed_sentences')) {
+          hasTimedColumn = false;
+          r = await sbRpc('GET', `transcript_cache?select=segments,sentences,fetched_at&video_id=eq.${encodeURIComponent(videoId)}`);
+        }
+      }
+      if (!r.ok) {
+        console.error('[transcript/cache] GET db error', r.status, await readError(r));
+        return res.status(200).json({ ok: false, reason: `db error ${r.status}` });
+      }
       const rows = await r.json();
       if (!rows?.length) return res.status(200).json({ ok: false, hit: false });
 
@@ -57,6 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ok:        true,
         hit:       true,
         sentences: row.sentences,
+        timedSentences: hasTimedColumn ? (row.timed_sentences ?? []) : [],
         segments:  row.segments,
       });
     } catch (e) {
@@ -67,20 +88,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // ── POST: キャッシュ書き込み ──────────────────────────────
   if (req.method === 'POST') {
-    const { videoId, segments, sentences } = req.body ?? {};
+    const { videoId, segments, sentences, timedSentences } = req.body ?? {};
     if (!videoId || !segments || !sentences)
       return res.status(400).json({ ok: false, reason: 'missing fields' });
 
     try {
-      const r = await sbRpc('POST', 'transcript_cache', {
+      const payload = {
         video_id:   videoId,
         segments,
         sentences,
+        timed_sentences: Array.isArray(timedSentences) ? timedSentences : [],
         seg_count:  segments.length,
         fetched_at: new Date().toISOString(),
-      });
+      };
+      let r = await sbRpc('POST', 'transcript_cache?on_conflict=video_id', payload);
+      if (!r.ok) {
+        const err = await readError(r);
+        if (err.includes('timed_sentences')) {
+          const { timed_sentences, ...legacyPayload } = payload;
+          r = await sbRpc('POST', 'transcript_cache?on_conflict=video_id', legacyPayload);
+        }
+      }
       const ok = r.status >= 200 && r.status < 300;
-      console.debug(`[transcript/cache] POST ${videoId}: ${r.status}`);
+      if (!ok) console.error('[transcript/cache] POST db error', r.status, await readError(r));
+      else console.debug(`[transcript/cache] POST ${videoId}: ${r.status}`);
       return res.status(200).json({ ok });
     } catch (e) {
       console.error('[transcript/cache] POST error', e);

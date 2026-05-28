@@ -14,14 +14,55 @@ function headers() {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  const { type = 'translation', limit = '50' } = req.query as { type?: string; limit?: string };
+  const { type = 'translation', limit = '50', period = 'total', userId = '' } = req.query as { type?: string; limit?: string; period?: string; userId?: string };
   if (!SB_URL) return res.status(200).json({ ranking: [] });
+
+  const since = (() => {
+    const now = new Date();
+    if (period === 'daily') {
+      now.setHours(0, 0, 0, 0);
+      return now.toISOString();
+    }
+    if (period === 'weekly') {
+      now.setDate(now.getDate() - 7);
+      return now.toISOString();
+    }
+    if (period === 'monthly') {
+      now.setDate(now.getDate() - 30);
+      return now.toISOString();
+    }
+    return '';
+  })();
+  const periodFilter = since ? `&created_at=gte.${encodeURIComponent(since)}` : '';
+  const ownId = String(userId || '');
+  const withOwnLearning = (ranking: any[]) => {
+    if (!ownId || ranking.some(row => row.user_id === ownId)) return ranking;
+    return [...ranking, {
+      user_id: ownId,
+      nickname: `Guest${ownId.slice(-4)}`,
+      avatar: '',
+      sessions: 0,
+      accuracy: 0,
+      coins: 0,
+      rank_score: 0,
+      score: 0,
+    }];
+  };
+  const withOwnTranslation = (ranking: any[]) => {
+    if (!ownId || ranking.some(row => row.user_id === ownId)) return ranking;
+    return [...ranking, {
+      user_id: ownId,
+      nickname: `Guest${ownId.slice(-4)}`,
+      avatar: '',
+      score: 0,
+    }];
+  };
 
   try {
     if (type === 'translation') {
       // 翻訳スコア合計ランキング
       const r = await fetch(
-        `${SB_URL}/rest/v1/user_translations?select=user_id,score&order=score.desc&limit=${limit}`,
+        `${SB_URL}/rest/v1/user_translations?select=user_id,score,created_at${periodFilter}&order=score.desc&limit=1000`,
         { headers: headers() },
       );
       const rows = r.ok ? await r.json() : [];
@@ -53,13 +94,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .sort((a, b) => b.score - a.score)
         .slice(0, Number(limit));
 
-      return res.status(200).json({ ranking, type: 'translation' });
+      return res.status(200).json({ ranking: withOwnTranslation(ranking), type: 'translation', period });
     }
 
     if (type === 'learning') {
       // 学習ログ集計
       const r = await fetch(
-        `${SB_URL}/rest/v1/learning_logs?select=user_id,type,correct,total&limit=1000`,
+        `${SB_URL}/rest/v1/learning_logs?select=user_id,type,correct,total,created_at${periodFilter}&limit=1000`,
         { headers: headers() },
       );
       const rows = r.ok ? await r.json() : [];
@@ -106,7 +147,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .sort((a, b) => b.rank_score - a.rank_score)
         .slice(0, Number(limit));
 
-      return res.status(200).json({ ranking, type: 'learning' });
+      return res.status(200).json({ ranking: withOwnLearning(ranking), type: 'learning', period });
     }
 
     return res.status(400).json({ error: 'unknown type' });

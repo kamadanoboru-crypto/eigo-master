@@ -1,6 +1,6 @@
-# 🎓 英語マスター
+# 🎓 English Base
 
-YouTube動画・BBCニュースで**英語を語順のまま理解する**学習アプリ。
+YouTube動画・BBC/Page Sixニュースで**英語を語順のまま理解する**学習アプリ。
 
 **⚠️ 重要：本アプリで提供される字幕・翻訳の正確性は保証されません。学習補助ツールとしてご利用ください。**
 
@@ -15,7 +15,7 @@ YouTube動画・BBCニュースで**英語を語順のまま理解する**学習
 | 🎮 シューティング単語ゲーム | 英単語が落下→日本語4択で撃破、HP制+スキル装備 |
 | 🎰 ガチャ・装備 | ガチャでスキルチケット取得→ステージ前装備 |
 | 📰 対訳リーダー | 英文+翻訳を貼り付け→上下分割表示+同期スクロール |
-| 🌐 BBC学習モード | 単語タップ→意味、文タップ→翻訳（API Route経由） |
+| 🌐 ニュース学習モード | BBC / Page Six のRSS要約で、単語タップ→意味、文タップ→翻訳 |
 | 📊 TOEIC予想スコア | 学習履歴からスコア推定 |
 | 🔐 Googleログイン | Supabase Auth、未設定でもlocalStorageで動作 |
 
@@ -33,8 +33,8 @@ YouTube動画・BBCニュースで**英語を語順のまま理解する**学習
 ## ⚡ すぐに動かす（env未設定でも動く）
 
 ```bash
-git clone https://github.com/your-name/eigo-master.git
-cd eigo-master
+git clone https://github.com/your-name/eigo-base.git
+cd eigo-base
 npm install
 npm run dev          # http://localhost:3000
 ```
@@ -259,7 +259,7 @@ vercel
 ## 📁 ファイル構成
 
 ```
-eigo-master/
+eigo-base/
 ├── components/EigoMaster.tsx   # メインUI（全機能）
 ├── pages/
 │   ├── index.tsx               # エントリー（SSR無効）

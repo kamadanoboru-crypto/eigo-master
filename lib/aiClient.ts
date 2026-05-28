@@ -2,18 +2,19 @@
 /**
  * lib/aiClient.ts  — サーバーサイド専用
  *
- * フォールバック順: Groq → Cohere → Gemini → OpenAI → Dummy
- * 環境変数: AI_PROVIDER_PRIORITY=groq,cohere,gemini,openai,dummy
+ * フォールバック順: Groq → Cohere → Gemini → OpenAI
+ * 環境変数: AI_PROVIDER_PRIORITY=groq,cohere,gemini,openai
  *
  * ・JSON parse 失敗もフォールバック対象
- * ・全失敗でも必ずダミーデータを返す（アプリは落とさない）
+ * ・全失敗時は呼び出し元が学習用フォールバックを返す
  */
 
-type Provider = 'groq' | 'cohere' | 'gemini' | 'openai' | 'dummy';
+type Provider = 'groq' | 'cohere' | 'gemini' | 'openai';
 
 function getPriority(): Provider[] {
-  const raw = process.env.AI_PROVIDER_PRIORITY ?? 'groq,cohere,gemini,openai,dummy';
-  return raw.split(',').map(s => s.trim() as Provider).filter(Boolean);
+  const raw = process.env.AI_PROVIDER_PRIORITY ?? 'groq,cohere,gemini,openai';
+  const allowed = new Set<Provider>(['groq', 'cohere', 'gemini', 'openai']);
+  return raw.split(',').map(s => s.trim() as Provider).filter(p => allowed.has(p));
 }
 
 const MODELS: Partial<Record<Provider, string>> = {
@@ -29,7 +30,7 @@ export async function callAI(
   maxTokens = 1000,
   system?: string,
 ): Promise<string> {
-  const providers = getPriority().filter(p => p !== 'dummy');
+  const providers = getPriority();
   const log: string[] = [];
 
   for (const p of providers) {

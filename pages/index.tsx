@@ -16,7 +16,7 @@ const EigoMaster = dynamic(
         fontFamily: "'Noto Sans JP', sans-serif", background: '#F8FAFC',
       }}>
         <div style={{ fontSize: 40 }}>🎓</div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A' }}>英語マスター</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A' }}>English Base</div>
         <div style={{ fontSize: 14, color: '#94A3B8' }}>読み込み中...</div>
       </div>
     ),
@@ -33,10 +33,10 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>英語マスター - YouTube・BBCで英語を語順のまま理解する学習アプリ</title>
+        <title>English Base - YouTube・BBCで英語を語順のまま理解する学習アプリ</title>
         <meta name="description" content="YouTubeやBBCニュースを使って、英語を語順のまま理解する学習アプリ。字幕チャンク分解、テスト、ゲームで楽しく英語を学習できます。" />
         <meta name="keywords" content="英語学習,YouTube,BBC,TOEIC,英文読解,語順" />
-        <meta property="og:title" content="英語マスター" />
+        <meta property="og:title" content="English Base" />
         <meta property="og:description" content="YouTubeやBBCで英語を語順のまま理解する学習アプリ" />
         <meta property="og:type" content="website" />
       </Head>
@@ -45,12 +45,12 @@ export default function Home() {
         {/* ヘッダー */}
         <header style={styles.header}>
           <div style={styles.headerContent}>
-            <h1 style={styles.appTitle}>🎓 英語マスター</h1>
+            <h1 style={styles.appTitle}>🎓 English Base</h1>
             <p style={styles.appTagline}>YouTube・BBCニュースで英語を語順のまま理解する</p>
           </div>
           <nav style={styles.nav}>
             <Link href="/about" style={styles.navLink}>について</Link>
-            <Link href="/privacy-policy" style={styles.navLink}>プライバシー</Link>
+            <Link href="/privacy" style={styles.navLink}>プライバシー</Link>
             <Link href="/terms" style={styles.navLink}>利用規約</Link>
             <Link href="/contact" style={styles.navLink}>お問い合わせ</Link>
           </nav>
@@ -148,7 +148,7 @@ export default function Home() {
             <div style={styles.noticeBox}>
               <h3 style={styles.noticeTitle}>🔐 プライバシー</h3>
               <p style={styles.noticeText}>
-                ログインなしでも利用できますが、ブラウザのキャッシュをクリアするとデータが失われます。Googleログインで安全に学習履歴を保存できます。詳細は<Link href="/privacy-policy" style={{ color: '#2563eb' }}>プライバシーポリシー</Link>をご参照ください。
+                ログインなしでも利用できますが、ブラウザのキャッシュをクリアするとデータが失われます。Googleログインで安全に学習履歴を保存できます。詳細は<Link href="/privacy" style={{ color: '#2563eb' }}>プライバシーポリシー</Link>をご参照ください。
               </p>
             </div>
           </div>
@@ -193,10 +193,10 @@ export default function Home() {
         {/* フッター */}
         <footer style={styles.footer}>
           <div style={styles.footerContent}>
-            <p>&copy; 2025 英語マスター. All rights reserved.</p>
+            <p>&copy; 2025 English Base. All rights reserved.</p>
             <div style={styles.footerLinks}>
             <Link href="/about" style={styles.footerLink}>について</Link>
-            <Link href="/privacy-policy" style={styles.footerLink}>プライバシー</Link>
+            <Link href="/privacy" style={styles.footerLink}>プライバシー</Link>
             <Link href="/terms" style={styles.footerLink}>利用規約</Link>
             <Link href="/contact" style={styles.footerLink}>お問い合わせ</Link>
             </div>

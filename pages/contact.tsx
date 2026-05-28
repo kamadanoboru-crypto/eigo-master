@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import Head from 'next/head';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -40,13 +40,13 @@ export default function Contact() {
   return (
     <>
       <Head>
-        <title>お問い合わせ | 英語マスター</title>
-        <meta name="description" content="英語マスターへのお問い合わせフォームです。ご質問やご不明な点はこちらから。" />
+        <title>お問い合わせ | English Base</title>
+        <meta name="description" content="English Baseへのお問い合わせフォームです。ご質問やご不明な点はこちらから。" />
       </Head>
       <div className={styles.container}>
         <header className={styles.header}>
           <Link href="/">
-            <a className={styles.logo}>🎓 英語マスター</a>
+            <a className={styles.logo}>🎓 English Base</a>
           </Link>
         </header>
 
@@ -159,10 +159,10 @@ export default function Contact() {
           <div className={styles.footerLinks}>
             <Link href="/">ホーム</Link>
             <Link href="/about">について</Link>
-            <Link href="/privacy-policy">プライバシーポリシー</Link>
+            <Link href="/privacy">プライバシーポリシー</Link>
             <Link href="/terms">利用規約</Link>
           </div>
-          <p>&copy; 2025 英語マスター. All rights reserved.</p>
+          <p>&copy; 2025 English Base. All rights reserved.</p>
         </footer>
       </div>
     </>
