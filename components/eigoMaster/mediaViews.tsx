@@ -1933,6 +1933,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
   // ── ステージ開始 ─────────────────────────────────────────────
   const startWordShooter = async function () {
     let mode = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'test';
+    if (mode !== 'practice' && mode !== 'test') mode = 'test';
     const cost = mode === 'practice' ? COIN_COSTS.PRACTICE : COIN_COSTS.TEST;
     const requestedCount = mode === 'practice' ? 5 : 10;
     const localPool = buildWordPool();
@@ -1983,6 +1984,8 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
       t$('????????????????????', 'warn');
       return;
     }
+    const first = queue[0];
+    const choicePool = [...localPool, ...generatedWords];
     if (generatedWords.length) setWsQuizWords(generatedWords);
     setWsScore(0);
     setWsLives(wsEquipped.includes('shield') ? wsMaxLives + 1 : wsMaxLives);
@@ -2003,6 +2006,15 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
       heal: skillCount.heal + 1
     });
     setWsSlowed(false);
+    setWsWordQueue(queue.slice(1));
+    setWsCurrentWord({
+      id: String(Date.now()),
+      en: first.en,
+      jp: first.jp,
+      x: 15 + Math.random() * 60
+    });
+    setWsChoices(makeChoices(first.jp, choicePool));
+    setWsChoiceResult(null);
     setWsPhase('play');
     setWsActive(true);
     setWsPhaseScreen('play');
@@ -2016,16 +2028,6 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
       }
       t$("".concat(mode === 'practice' ? '??' : '???', " -").concat(cost, "???"), 'info');
     }
-    setWsWordQueue(queue.slice(1));
-    const first = queue[0];
-    setWsCurrentWord({
-      id: String(Date.now()),
-      en: first.en,
-      jp: first.jp,
-      x: 15 + Math.random() * 60
-    });
-    setWsChoices(makeChoices(first.jp, [...localPool, ...generatedWords]));
-    setWsChoiceResult(null);
   };
   const openEquipScreen = () => {
     setWsPhaseScreen('equip');
