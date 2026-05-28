@@ -424,15 +424,24 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
     </div>;
   };
   const Talk = () => {
+    const categories = [
+      { id: 'general', label: 'Study' },
+      { id: 'toeic', label: 'TOEIC' },
+      { id: 'grammar', label: 'Grammar' },
+      { id: 'vocabulary', label: 'Words' },
+      { id: 'listening', label: 'Listening' },
+      { id: 'translation', label: 'Translation' }
+    ];
     const [posts, setPosts] = React.useState([]);
     const [body, setBody] = React.useState('');
     const [category, setCategory] = React.useState('general');
+    const [sortMode, setSortMode] = React.useState('popular');
     const [editing, setEditing] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
     const loadPosts = React.useCallback(async () => {
       setLoading(true);
       try {
-        const r = await fetch('/api/social/talk?limit=30');
+        const r = await fetch('/api/social/talk?limit=50');
         const d = await r.json().catch(() => ({}));
         setPosts(Array.isArray(d.posts) ? d.posts : []);
       } catch (e) {
@@ -444,6 +453,12 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
     React.useEffect(() => {
       loadPosts();
     }, [loadPosts]);
+    const sortedPosts = [...posts].sort((a, b) => {
+      if (sortMode === 'new') return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      const scoreA = Number(a.like_count || 0) - Number(a.dislike_count || 0) + Number(a.reply_count || 0) * 2;
+      const scoreB = Number(b.like_count || 0) - Number(b.dislike_count || 0) + Number(b.reply_count || 0) * 2;
+      return scoreB - scoreA || new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
     const submitPost = async () => {
       if (!body.trim()) return;
       const temp = {
@@ -464,13 +479,7 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         const r = await fetch('/api/social/talk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId,
-            body: temp.body,
-            category,
-            nickname: myProfile?.nickname,
-            avatarEmoji: myProfile?.avatar_emoji
-          })
+          body: JSON.stringify({ userId, body: temp.body, category, nickname: myProfile?.nickname, avatarEmoji: myProfile?.avatar_emoji })
         });
         const d = await r.json().catch(() => ({}));
         if (d.ok && d.post) setPosts(prev => prev.map(p => p.id === temp.id ? d.post : p));
@@ -489,13 +498,7 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         const r = await fetch('/api/social/talk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'edit',
-            postId: post.id,
-            userId,
-            body: nextBody,
-            category: nextCategory
-          })
+          body: JSON.stringify({ action: 'edit', postId: post.id, userId, body: nextBody, category: nextCategory })
         });
         const d = await r.json().catch(() => ({}));
         if (d.ok && d.post) setPosts(prev => prev.map(p => p.id === post.id ? d.post : p));
@@ -504,45 +507,56 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         loadPosts();
       }
     };
+    const votePost = async (post, vote) => {
+      setPosts(prev => prev.map(p => p.id === post.id ? {
+        ...p,
+        like_count: Math.max(0, Number(p.like_count || 0) + (vote === 1 ? 1 : 0)),
+        dislike_count: Math.max(0, Number(p.dislike_count || 0) + (vote === -1 ? 1 : 0))
+      } : p));
+      try {
+        await fetch('/api/social/talk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'vote', postId: post.id, userId, vote })
+        });
+      } catch (e) {}
+    };
     return <div className="sa" style={{ padding: 16 }}>
-      <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
-        <select className="url-inp" value={category} onChange={e => setCategory(e.target.value)}>
-          <option value="general">general</option>
-          <option value="toeic">toeic</option>
-          <option value="grammar">grammar</option>
-          <option value="vocabulary">vocabulary</option>
-          <option value="listening">listening</option>
-          <option value="translation">translation</option>
-        </select>
-        <textarea className="url-inp" value={body} onChange={e => setBody(e.target.value)} rows={3} />
-        <button className="bp" onClick={submitPost}>??</button>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        {[{ id: 'popular', label: 'Popular' }, { id: 'new', label: 'New' }].map(tab => <button key={tab.id} className="bg" style={{ flex: 1, background: sortMode === tab.id ? 'var(--p)' : 'var(--sur)', color: sortMode === tab.id ? '#fff' : 'var(--t2)' }} onClick={() => setSortMode(tab.id)}>{tab.label}</button>)}
       </div>
-      {loading && <div className="empty">?????...</div>}
-      {!loading && posts.length === 0 && <div className="empty">??????????</div>}
-      {!loading && posts.map((post, i) => {
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 10 }}>
+        {categories.map(cat => <button key={cat.id} className="bg" style={{ padding: '7px 10px', whiteSpace: 'nowrap', borderColor: category === cat.id ? 'var(--a)' : 'var(--bd)' }} onClick={() => setCategory(cat.id)}>{cat.label}</button>)}
+      </div>
+      <div className="sc" style={{ marginBottom: 14 }}>
+        <textarea className="url-inp" value={body} onChange={e => setBody(e.target.value)} rows={3} placeholder="Share a study note" style={{ width: '100%', resize: 'vertical', marginBottom: 8 }} />
+        <button className="bp" style={{ width: '100%' }} onClick={submitPost}>Post</button>
+      </div>
+      {loading && <div className="empty">Loading...</div>}
+      {!loading && sortedPosts.length === 0 && <div className="empty">No posts yet</div>}
+      {!loading && sortedPosts.map((post, i) => {
         const isMine = post.user_id === userId;
         const isEditing = editing?.id === post.id;
-        return <div key={post.id || i} className="lcard" style={{ marginBottom: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-            <div className="jp" style={{ fontWeight: 800 }}>{post.nickname || post.user_id?.slice?.(0, 8) || 'Guest'}</div>
-            <div className="chip">{post.category || 'general'}</div>
-          </div>
-          {isEditing ? <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
-            <select className="url-inp" value={editing.category} onChange={e => setEditing(prev => ({ ...prev, category: e.target.value }))}>
-              <option value="general">general</option>
-              <option value="toeic">toeic</option>
-              <option value="grammar">grammar</option>
-              <option value="vocabulary">vocabulary</option>
-              <option value="listening">listening</option>
-              <option value="translation">translation</option>
-            </select>
-            <textarea className="url-inp" value={editing.body} onChange={e => setEditing(prev => ({ ...prev, body: e.target.value }))} rows={3} />
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="bp" onClick={() => saveEdit(post)}>??</button>
-              <button className="bg" onClick={() => setEditing(null)}>?????</button>
+        const cat = categories.find(c => c.id === post.category)?.label || post.category || 'Study';
+        return <div key={post.id || i} className="sc" style={{ marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ minWidth: 0 }}>
+              <div className="jp" style={{ fontWeight: 800 }}>{post.nickname || post.user_id?.slice?.(0, 8) || 'Guest'}</div>
+              <div style={{ fontSize: 11, color: 'var(--t3)' }}>{post.created_at ? new Date(post.created_at).toLocaleDateString('ja-JP') : ''}</div>
             </div>
-          </div> : <div className="jp" style={{ marginTop: 8, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{post.body}</div>}
-          {isMine && !isEditing && <button className="bg" style={{ marginTop: 8 }} onClick={() => setEditing({ id: post.id, body: post.body || '', category: post.category || 'general' })}>??</button>}
+            <span className="strategy-chip sc-b">{cat}</span>
+          </div>
+          {isEditing ? <div style={{ display: 'grid', gap: 8 }}>
+            <select className="url-inp" value={editing.category} onChange={e => setEditing(prev => ({ ...prev, category: e.target.value }))}>{categories.map(cat => <option key={cat.id} value={cat.id}>{cat.label}</option>)}</select>
+            <textarea className="url-inp" value={editing.body} onChange={e => setEditing(prev => ({ ...prev, body: e.target.value }))} rows={3} />
+            <div style={{ display: 'flex', gap: 8 }}><button className="bp" onClick={() => saveEdit(post)}>Save</button><button className="bg" onClick={() => setEditing(null)}>Cancel</button></div>
+          </div> : <div className="jp" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, marginBottom: 10 }}>{post.body}</div>}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="bg" onClick={() => votePost(post, 1)}>Like {post.like_count || 0}</button>
+            <button className="bg" onClick={() => votePost(post, -1)}>Dislike {post.dislike_count || 0}</button>
+            <span style={{ fontSize: 12, color: 'var(--t3)' }}>Replies {post.reply_count || 0}</span>
+            {isMine && !isEditing && <button className="bg" style={{ marginLeft: 'auto' }} onClick={() => setEditing({ id: post.id, body: post.body || '', category: post.category || 'general' })}>Edit</button>}
+          </div>
         </div>;
       })}
     </div>;
@@ -559,7 +573,7 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         flex: 1,
         background: rankingTab === tab ? "var(--p)" : "var(--sur)",
         color: rankingTab === tab ? "#fff" : "var(--t2)"
-      }} onClick={() => loadRanking(tab, rankingPeriod)}>{tab === "learning" ? "学習" : "翻訳"}</button>)}
+      }} onClick={() => loadRanking(tab, rankingPeriod)}>{tab === "learning" ? "Learning" : "Translation"}</button>)}
     </div>
     <div style={{
       display: "flex",
@@ -569,10 +583,10 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
       {["weekly", "monthly", "all"].map((period, __idx) => <button key={period} className="bg" style={{
         flex: 1,
         borderColor: rankingPeriod === period ? "var(--a)" : "var(--bd)"
-      }} onClick={() => loadRanking(rankingTab, period)}>{period === "weekly" ? "週" : period === "monthly" ? "月" : "累計"}</button>)}
+      }} onClick={() => loadRanking(rankingTab, period)}>{period === "weekly" ? "Weekly" : period === "monthly" ? "Monthly" : "All"}</button>)}
     </div>
-    {rankingLoading && <div className="empty">読み込み中...</div>}
-    {!rankingLoading && rankingData.length === 0 && <div className="empty">{rankingTab === "learning" ? "????????????" : "????????????????"}</div>}
+    {rankingLoading && <div className="empty">Loading...</div>}
+    {!rankingLoading && rankingData.length === 0 && <div className="empty">{rankingTab === "learning" ? "No learning data yet" : "No ranking data yet"}</div>}
     {!rankingLoading && rankingData.map((row, i) => <div key={row.user_id || row.id || i} className="rank-row">
       <div key={row?.id ?? i} className={`rank-no ${i === 0 ? "rank-no-1" : i === 1 ? "rank-no-2" : i === 2 ? "rank-no-3" : "rank-no-n"}`}>{i + 1}</div>
       <div key={row?.id ?? i} className="rank-nick">{row.nickname || row.user_id?.slice?.(0, 8) || "Learner"}</div>
@@ -585,8 +599,8 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         fontSize: 18,
         fontWeight: 800,
         marginBottom: 12
-      }}>ニックネーム</div>
-      <input className="url-inp" value={nickInput} onChange={e => setNickInput(e.target.value)} placeholder="表示名" />
+      }}>Nickname</div>
+      <input className="url-inp" value={nickInput} onChange={e => setNickInput(e.target.value)} placeholder="Display name" />
       <div style={{
         display: "flex",
         gap: 8,
@@ -594,47 +608,42 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
       }}>
         <button className="bg" style={{
           flex: 1
-        }} onClick={() => setShowNickEdit(false)}>キャンセル</button>
+        }} onClick={() => setShowNickEdit(false)}>Cancel</button>
         <button className="bp" style={{
           flex: 1
-        }} onClick={() => saveProfile(nickInput)}>保存</button>
+        }} onClick={() => saveProfile(nickInput)}>Save</button>
       </div>
     </div>
   </div> : null;
-  const Settings = () => <div className="sa">
-    <div className="stlist">
-      <div className="stst">Account</div>
-      <div className="sti">
-        <div>
-          <div className="jp" style={{
-            fontWeight: 800
-          }}>プロフィール</div>
-          <div style={{
-            fontSize: 12,
-            color: "var(--t3)"
-          }}>{myProfile?.nickname || authUser?.email || "未設定"}</div>
+  const Settings = () => {
+    const totalSessions = [...TR.word, ...TR.grammar, ...TR.listening, ...TR.shadowing].length;
+    const todayCount = streakStats?.todayCount || 0;
+    const streak = streakStats?.streak || 0;
+    return <div className="sa">
+      <div className="stlist">
+        <div className="sc" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--pl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>EB</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="jp" style={{ fontWeight: 800, fontSize: 16 }}>{myProfile?.nickname || authUser?.email || 'Guest learner'}</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)' }}>English Base learner</div>
+          </div>
+          <button className="bg" onClick={() => { setNickInput(myProfile?.nickname || ''); setShowNickEdit(true); }}>Edit</button>
         </div>
-        <button className="bg" onClick={() => {
-          setNickInput(myProfile?.nickname || "");
-          setShowNickEdit(true);
-        }}>編集</button>
+        <div className="stst">Stats</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>Today</div><div style={{ fontSize: 26, fontWeight: 800, color: 'var(--p)' }}>{todayCount}</div></div>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>Streak</div><div style={{ fontSize: 26, fontWeight: 800, color: 'var(--a)' }}>{streak}d</div></div>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>Sessions</div><div style={{ fontSize: 26, fontWeight: 800 }}>{totalSessions}</div></div>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>Saved</div><div style={{ fontSize: 26, fontWeight: 800 }}>{saved.length}</div></div>
+        </div>
+        <div className="stst">Wallet</div>
+        <div className="sti"><span>Coins</span><strong>{wallet.coins}</strong></div>
+        <div className="sti"><span>Tickets</span><strong>{wallet.gacha_tickets}</strong></div>
+        <button className="bg" onClick={() => setShowRanking(true)}>Open ranking</button>
+        {authUser ? <button className="bg" onClick={async () => { await supabaseAuth.signOut(); if (typeof window !== 'undefined') window.location.reload(); }}>Logout</button> : <button className="bp" onClick={loginWithGoogle}>Login with Google</button>}
       </div>
-      <div className="stst">Wallet</div>
-      <div className="sti">
-        <span>🪙 コイン</span>
-        <strong>{wallet.coins}</strong>
-      </div>
-      <div className="sti">
-        <span>🎟 ガチャチケット</span>
-        <strong>{wallet.gacha_tickets}</strong>
-      </div>
-      <button className="bg" onClick={() => setShowRanking(true)}>ランキングを見る</button>
-      {authUser ? <button className="bg" onClick={async () => {
-        await supabaseAuth.signOut();
-        if (typeof window !== "undefined") window.location.reload();
-      }}>ログアウト</button> : <button className="bp" onClick={loginWithGoogle}>Googleでログイン</button>}
-    </div>
-  </div>;
+    </div>;
+  };
   return {
     UnlockModal,
     Talk,

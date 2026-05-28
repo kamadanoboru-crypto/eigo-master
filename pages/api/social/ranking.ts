@@ -105,12 +105,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
       const rows = r.ok ? await r.json() : [];
 
-      const map: Record<string, { sessions: number; correct: number; total: number }> = {};
+      const map: Record<string, { sessions: number; correct: number; total: number; posts: number; likes: number }> = {};
       rows.forEach((row: any) => {
-        if (!map[row.user_id]) map[row.user_id] = { sessions: 0, correct: 0, total: 0 };
+        if (!map[row.user_id]) map[row.user_id] = { sessions: 0, correct: 0, total: 0, posts: 0, likes: 0 };
         map[row.user_id].sessions++;
         map[row.user_id].correct += row.correct ?? 0;
         map[row.user_id].total   += row.total   ?? 0;
+      });
+      const talkRows = await fetch(
+        `${SB_URL}/rest/v1/talk_posts?select=user_id,like_count,created_at${periodFilter}&limit=1000`,
+        { headers: headers() },
+      ).then(r => r.ok ? r.json() : []);
+      talkRows.forEach((row: any) => {
+        if (!map[row.user_id]) map[row.user_id] = { sessions: 0, correct: 0, total: 0, posts: 0, likes: 0 };
+        map[row.user_id].posts++;
+        map[row.user_id].likes += Number(row.like_count || 0);
       });
 
       // コイン残高
@@ -141,7 +150,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             sessions: m.sessions,
             accuracy,
             coins,
-            rank_score: m.sessions * 10 + accuracy,
+            posts: m.posts,
+            likes: m.likes,
+            rank_score: m.sessions * 10 + accuracy + m.posts * 5 + m.likes * 2,
           };
         })
         .sort((a, b) => b.rank_score - a.rank_score)

@@ -1906,7 +1906,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
   };
   // ── 4択選択肢を生成（正解1 + ダミー3）────────────────────────
   const makeChoices = (correct, pool) => {
-    const wrong = shuffle(pool.filter(w => w.jp !== correct)).slice(0, 3).map((w, __idx) => w.jp);
+    const wrong = shuffle(pool.filter(w => w.jp !== correct)).slice(0, 7).map((w, __idx) => w.jp);
     return shuffle([correct, ...wrong]);
   };
   // ── 次の問題をセット ─────────────────────────────────────────
@@ -1938,11 +1938,11 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     const requestedCount = mode === 'practice' ? 5 : 10;
     const localPool = buildWordPool();
     if (!localPool.length) {
-      t$('???????????????????????', 'warn');
+      t$('Word pool is empty.', 'warn');
       return;
     }
     if (SB_READY && wallet.coins < cost) {
-      t$("??????????????: ".concat(cost, "??"), 'warn');
+      t$("Not enough coins: ".concat(cost), 'warn');
       return;
     }
     let generatedWords = [];
@@ -1981,7 +1981,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     const baseWords = mode === 'practice' ? shuffle(localPool).slice(0, requestedCount) : shuffle(localPool).slice(0, 5);
     const queue = shuffle(mode === 'test' && generatedWords.length ? [...baseWords, ...generatedWords].slice(0, requestedCount) : shuffle(localPool).slice(0, requestedCount));
     if (!queue.length) {
-      t$('????????????????????', 'warn');
+      t$('Could not start word shooter.', 'warn');
       return;
     }
     const first = queue[0];
@@ -2026,7 +2026,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
         setWsPhaseScreen('menu');
         return;
       }
-      t$("".concat(mode === 'practice' ? '??' : '???', " -").concat(cost, "???"), 'info');
+      t$("".concat(mode === 'practice' ? 'Practice' : 'Test', " -").concat(cost, " coins"), 'info');
     }
   };
   const openEquipScreen = () => {

@@ -70,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const correctRows = baseRows.filter((r: any) => latest.get(r.id)?.is_correct === true);
   const wrongRows = baseRows.filter((r: any) => latest.get(r.id)?.is_correct === false);
   const untouchedRows = baseRows.filter((r: any) => !latest.has(r.id));
-  const generatedTarget = Math.max(1, Math.floor(safeCount / 2));
+  const generatedTarget = safeCount >= 10 ? 3 : Math.max(1, Math.floor(safeCount / 3));
   const allowedGeneratedTarget = generatedTarget;
   const aiCost = 0;
   const remaining: number | undefined = undefined;
@@ -83,20 +83,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ...weightedShuffleByQuality(wrongRows).slice(0, wrongTarget),
   ];
 
+  const generatedRows: any[] = [];
   for (let i = 0; i < allowedGeneratedTarget; i += 1) {
     const generated = await generateGrammarQuestion(String(userId));
-    if (generated) selected.push(generated);
+    if (generated) generatedRows.push(generated);
   }
 
-  const fill = weightedShuffleByQuality([...untouchedRows, ...baseRows]).filter((r: any) => !selected.some(s => s.id === r.id));
-  const finalRows = uniqueById([...selected, ...fill]).slice(0, safeCount);
+  const dbSeed = uniqueById([
+    ...selected,
+    ...weightedShuffleByQuality(untouchedRows),
+    ...weightedShuffleByQuality(baseRows),
+  ]).filter((r: any) => !generatedRows.some(g => g.id === r.id)).slice(0, dbTarget);
+  const dbFill = weightedShuffleByQuality(rows)
+    .filter((r: any) => !dbSeed.some(s => s.id === r.id) && !generatedRows.some(g => g.id === r.id))
+    .slice(0, Math.max(0, dbTarget - dbSeed.length));
+  const finalRows = uniqueById([...dbSeed, ...dbFill, ...generatedRows]).slice(0, safeCount);
 
   return res.status(200).json({
     questions: weightedShuffleByQuality(finalRows).map(rowToQuestion),
     plan: {
       correctTarget,
       wrongTarget,
-      generatedTarget: allowedGeneratedTarget,
+      generatedTarget: generatedRows.length,
       requestedGeneratedTarget: generatedTarget,
       aiCost,
       remaining,

@@ -81,7 +81,7 @@ export function toQuestionRow(q: any, createdBy = '') {
     explanation: n.exp,
     category: n.cat,
     level: 'level_600',
-    source: 'toeic',
+    source: q?.source || 'toeic',
     created_by: createdBy || null,
   };
 }
@@ -163,9 +163,12 @@ export async function seedFallbackQuestions(userId = '') {
 }
 
 export async function generateGrammarQuestion(userId = '') {
-  const prompt = `Create one TOEIC Part 5 multiple-choice question for Japanese learners.
+  const prompt = `Create one natural TOEIC Part 5 multiple-choice question for Japanese learners.
+Match intermediate TOEIC level 600. Use natural business or daily workplace English.
+Include a grammar category such as tense, preposition, conjunction, passive voice, infinitive, participle, or vocabulary.
+Avoid awkward English, trivia, and ambiguous answers.
 Return JSON only:
-{"s":"English sentence with _____","ja":"自然な日本語訳","options":["correct","wrong1","wrong2","wrong3"],"correct":"correct","exp":"日本語の解説","cat":"カテゴリ"}`;
+{"s":"English sentence with _____","ja":"natural Japanese translation","options":["correct","wrong1","wrong2","wrong3"],"correct":"correct","exp":"Japanese explanation","cat":"grammar category","source":"ai"}`;
   try {
     const raw = await callAI(prompt, 900, 'Return valid JSON only.');
     const parsed = parseJSON<any>(raw, null);

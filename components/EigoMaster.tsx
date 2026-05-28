@@ -437,7 +437,7 @@ function EigoMasterInner() {
     const load = async () => {
       try {
         const uid = "user_id=eq.".concat(userId);
-        const [sLines, myL, tRes, uPts, uVids, captionRows] = await Promise.all([sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.caption&order=saved_at.desc")), fetch("/api/list/get?userId=".concat(encodeURIComponent(userId))).then(r => r.json()), sbFrom("learning_logs").select("*&".concat(uid, "&order=created_at.asc")), sbFrom("user_points").select("*&".concat(uid)), sbFrom("user_videos").select("*&order=added_at.desc&limit=100"), sbFrom("video_captions").select("select=video_id&limit=1000")]);
+        const [sLines, myL, tRes, uPts, uVids, captionRows, vVotes] = await Promise.all([sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.caption&order=saved_at.desc")), fetch("/api/list/get?userId=".concat(encodeURIComponent(userId))).then(r => r.json()), sbFrom("learning_logs").select("*&".concat(uid, "&order=created_at.asc")), sbFrom("user_points").select("*&".concat(uid)), sbFrom("user_videos").select("*&order=added_at.desc&limit=100"), sbFrom("video_captions").select("select=video_id&limit=1000"), sbFrom("video_votes").select("select=video_id,vote_type&user_id=eq.".concat(encodeURIComponent(userId), "&limit=1000"))]);
         // saved_items から保存済み文を復元（Phase3: 永続化）
         if (Array.isArray(sLines) && sLines.length > 0) {
           setSaved(sLines.map((r, __idx) => {
@@ -522,6 +522,12 @@ function EigoMasterInner() {
             const newOnes = userVids.filter(v => !existingIds.has(v.videoId));
             return newOnes.length > 0 ? [...newOnes, ...prev] : prev;
           });
+        }
+        if (Array.isArray(vVotes) && vVotes.length > 0) {
+          setVideoVotes(prev => ({
+            ...prev,
+            ...Object.fromEntries(vVotes.map((row, __idx) => [row.video_id, Number(row.vote_type)]))
+          }));
         }
         setDbReady(true);
       } catch (e) {
@@ -1194,7 +1200,7 @@ function EigoMasterInner() {
     const isSingleListPractice = Boolean(options.single || questionId);
     const count = isSingleListPractice ? 1 : 5;
     if (!options.free && !canStartPaidMode(COIN_COSTS.PRACTICE)) return;
-    if (isSingleListPractice) t$('??????1????????', 'ok');
+    if (isSingleListPractice) t$('Starting one selected question', 'ok');
     const qs = await fetchGrammarSession(userId, 'practice', count, questionId);
     const source = qs.length ? qs : await genGrammar(saved, count, userId);
     const enriched = source.map((q, __idx) => {
@@ -1221,7 +1227,7 @@ function EigoMasterInner() {
       ...w,
       coins: qs._meta.plan.remaining
     }));
-    if ((_qs__meta1 = qs._meta) === null || _qs__meta1 === void 0 ? void 0 : (_qs__meta_plan1 = _qs__meta1.plan) === null || _qs__meta_plan1 === void 0 ? void 0 : _qs__meta_plan1.aiCost) t$("Part5 AI?? -".concat(qs._meta.plan.aiCost, "???"), 'info');
+    if ((_qs__meta1 = qs._meta) === null || _qs__meta1 === void 0 ? void 0 : (_qs__meta_plan1 = _qs__meta1.plan) === null || _qs__meta_plan1 === void 0 ? void 0 : _qs__meta_plan1.aiCost) t$("Part5 AI -".concat(qs._meta.plan.aiCost, " coins"), 'info');
     const nextQuestions = qs.length ? qs : await genGrammar(saved, 10, userId);
     if (!nextQuestions.length) return;
     setGrammarMode('test');
@@ -1257,7 +1263,7 @@ function EigoMasterInner() {
       if (!isFree && !(await chargeStartedMode(mode))) resetQuizState('studyHub');
     } catch (err) {
       console.error('[startTest]', err.message);
-      t$('????????????????????????');
+      t$('Question generation failed. Starting with existing questions.');
       const qs = existingQuizQuestions(type, mode === 'practice' ? 5 : 10);
       resetQuizState(type);
       setTQs(qs.map(shuffleQuestionOptions));

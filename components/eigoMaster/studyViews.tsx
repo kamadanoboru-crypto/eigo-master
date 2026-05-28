@@ -1055,6 +1055,39 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
             padding: "7px 10px",
             whiteSpace: "nowrap"
           }} onClick={() => setNavTab('home')}>追加</button>}</div>}{/*#__PURE__*/<div style={{
+          background: "rgba(255,253,248,.9)",
+          border: "1px solid rgba(222,214,200,.82)",
+          borderRadius: "var(--r)",
+          padding: "13px 14px",
+          boxShadow: "var(--sh)",
+          display: "flex",
+          gap: 10,
+          alignItems: "center"
+        }}>{/*#__PURE__*/<div className="lcard-ico" style={{
+            background: "#EEF3F8"
+          }}>R</div>}{/*#__PURE__*/<div style={{
+            flex: 1,
+            minWidth: 0
+          }}>{/*#__PURE__*/<div className="jp" style={{
+              fontSize: 11,
+              fontWeight: 800,
+              color: "var(--t3)",
+              marginBottom: 2
+            }}>Recommended app</div>}{/*#__PURE__*/<div className="jp" style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: "var(--t)",
+              lineHeight: 1.35
+            }}>Rizdom</div>}{/*#__PURE__*/<div className="jp" style={{
+              fontSize: 11,
+              color: "var(--t3)",
+              lineHeight: 1.5
+            }}>Build a steady study habit</div>}</div>}{/*#__PURE__*/<a className="bg" href="https://play.google.com/store/apps/details?id=jp.co.benesse.risdomapp" target="_blank" rel="noreferrer" style={{
+            fontSize: 12,
+            padding: "7px 10px",
+            textDecoration: "none",
+            whiteSpace: "nowrap"
+          }}>Open</a>}</div>}{/*#__PURE__*/<div style={{
           display: "grid",
           gridTemplateColumns: "repeat(3,1fr)",
           gap: 8
