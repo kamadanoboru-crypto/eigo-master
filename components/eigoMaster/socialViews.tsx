@@ -425,12 +425,12 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
   };
   const Talk = () => {
     const categories = [
-      { id: 'general', label: 'Study' },
+      { id: 'general', label: '学習相談' },
       { id: 'toeic', label: 'TOEIC' },
-      { id: 'grammar', label: 'Grammar' },
-      { id: 'vocabulary', label: 'Words' },
-      { id: 'listening', label: 'Listening' },
-      { id: 'translation', label: 'Translation' }
+      { id: 'grammar', label: '文法' },
+      { id: 'vocabulary', label: '単語' },
+      { id: 'listening', label: 'リスニング' },
+      { id: 'translation', label: '翻訳' }
     ];
     const [posts, setPosts] = React.useState([]);
     const [body, setBody] = React.useState('');
@@ -522,18 +522,17 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
       } catch (e) {}
     };
     return <div className="sa" style={{ padding: 16 }}>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        {[{ id: 'popular', label: 'Popular' }, { id: 'new', label: 'New' }].map(tab => <button key={tab.id} className="bg" style={{ flex: 1, background: sortMode === tab.id ? 'var(--p)' : 'var(--sur)', color: sortMode === tab.id ? '#fff' : 'var(--t2)' }} onClick={() => setSortMode(tab.id)}>{tab.label}</button>)}
-      </div>
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 10 }}>
-        {categories.map(cat => <button key={cat.id} className="bg" style={{ padding: '7px 10px', whiteSpace: 'nowrap', borderColor: category === cat.id ? 'var(--a)' : 'var(--bd)' }} onClick={() => setCategory(cat.id)}>{cat.label}</button>)}
-      </div>
       <div className="sc" style={{ marginBottom: 14 }}>
-        <textarea className="url-inp" value={body} onChange={e => setBody(e.target.value)} rows={3} placeholder="Share a study note" style={{ width: '100%', resize: 'vertical', marginBottom: 8 }} />
-        <button className="bp" style={{ width: '100%' }} onClick={submitPost}>Post</button>
+        <div className="jp" style={{ fontWeight: 800, marginBottom: 8 }}>トークに投稿</div>
+        <select className="url-inp" value={category} onChange={e => setCategory(e.target.value)} style={{ width: '100%', marginBottom: 8 }}>{categories.map(cat => <option key={cat.id} value={cat.id}>{cat.label}</option>)}</select>
+        <textarea className="url-inp" value={body} onChange={e => setBody(e.target.value)} rows={3} placeholder="学習メモ・質問・気づきを書く" style={{ width: '100%', resize: 'vertical', marginBottom: 8 }} />
+        <button className="bp" style={{ width: '100%' }} onClick={submitPost}>投稿する</button>
       </div>
-      {loading && <div className="empty">Loading...</div>}
-      {!loading && sortedPosts.length === 0 && <div className="empty">No posts yet</div>}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        {[{ id: 'popular', label: '人気順' }, { id: 'new', label: '新着順' }].map(tab => <button key={tab.id} className="bg" style={{ flex: 1, background: sortMode === tab.id ? 'var(--p)' : 'var(--sur)', color: sortMode === tab.id ? '#fff' : 'var(--t2)' }} onClick={() => setSortMode(tab.id)}>{tab.label}</button>)}
+      </div>
+      {loading && <div className="empty">読み込み中...</div>}
+      {!loading && sortedPosts.length === 0 && <div className="empty">まだ投稿がありません</div>}
       {!loading && sortedPosts.map((post, i) => {
         const isMine = post.user_id === userId;
         const isEditing = editing?.id === post.id;
@@ -552,10 +551,10 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
             <div style={{ display: 'flex', gap: 8 }}><button className="bp" onClick={() => saveEdit(post)}>Save</button><button className="bg" onClick={() => setEditing(null)}>Cancel</button></div>
           </div> : <div className="jp" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, marginBottom: 10 }}>{post.body}</div>}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button className="bg" onClick={() => votePost(post, 1)}>Like {post.like_count || 0}</button>
-            <button className="bg" onClick={() => votePost(post, -1)}>Dislike {post.dislike_count || 0}</button>
-            <span style={{ fontSize: 12, color: 'var(--t3)' }}>Replies {post.reply_count || 0}</span>
-            {isMine && !isEditing && <button className="bg" style={{ marginLeft: 'auto' }} onClick={() => setEditing({ id: post.id, body: post.body || '', category: post.category || 'general' })}>Edit</button>}
+            <button className="bg" onClick={() => votePost(post, 1)}>いいね {post.like_count || 0}</button>
+            <button className="bg" onClick={() => votePost(post, -1)}>うーん {post.dislike_count || 0}</button>
+            <span style={{ fontSize: 12, color: 'var(--t3)' }}>返信 {post.reply_count || 0}</span>
+            {isMine && !isEditing && <button className="bg" style={{ marginLeft: 'auto' }} onClick={() => setEditing({ id: post.id, body: post.body || '', category: post.category || 'general' })}>編集</button>}
           </div>
         </div>;
       })}
@@ -624,23 +623,28 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         <div className="sc" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--pl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>EB</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="jp" style={{ fontWeight: 800, fontSize: 16 }}>{myProfile?.nickname || authUser?.email || 'Guest learner'}</div>
-            <div style={{ fontSize: 12, color: 'var(--t3)' }}>English Base learner</div>
+            <div className="jp" style={{ fontWeight: 800, fontSize: 16 }}>{myProfile?.nickname || authUser?.email || 'ゲスト学習者'}</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)' }}>{authUser ? 'Googleログイン中' : '未ログイン: 端末内に保存'}</div>
           </div>
-          <button className="bg" onClick={() => { setNickInput(myProfile?.nickname || ''); setShowNickEdit(true); }}>Edit</button>
+          <button className="bg" onClick={() => { setNickInput(myProfile?.nickname || ''); setShowNickEdit(true); }}>名前変更</button>
         </div>
-        <div className="stst">Stats</div>
+        <div className="stst">学習状況</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>Today</div><div style={{ fontSize: 26, fontWeight: 800, color: 'var(--p)' }}>{todayCount}</div></div>
-          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>Streak</div><div style={{ fontSize: 26, fontWeight: 800, color: 'var(--a)' }}>{streak}d</div></div>
-          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>Sessions</div><div style={{ fontSize: 26, fontWeight: 800 }}>{totalSessions}</div></div>
-          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>Saved</div><div style={{ fontSize: 26, fontWeight: 800 }}>{saved.length}</div></div>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>今日の学習</div><div style={{ fontSize: 26, fontWeight: 800, color: 'var(--p)' }}>{todayCount}</div></div>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>連続日数</div><div style={{ fontSize: 26, fontWeight: 800, color: 'var(--a)' }}>{streak}日</div></div>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>テスト回数</div><div style={{ fontSize: 26, fontWeight: 800 }}>{totalSessions}</div></div>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>保存アイテム</div><div style={{ fontSize: 26, fontWeight: 800 }}>{saved.length}</div></div>
         </div>
-        <div className="stst">Wallet</div>
-        <div className="sti"><span>Coins</span><strong>{wallet.coins}</strong></div>
-        <div className="sti"><span>Tickets</span><strong>{wallet.gacha_tickets}</strong></div>
-        <button className="bg" onClick={() => setShowRanking(true)}>Open ranking</button>
-        {authUser ? <button className="bg" onClick={async () => { await supabaseAuth.signOut(); if (typeof window !== 'undefined') window.location.reload(); }}>Logout</button> : <button className="bp" onClick={loginWithGoogle}>Login with Google</button>}
+        <div className="stst">ウォレット</div>
+        <div className="sti"><span>コイン</span><strong>{wallet.coins}</strong></div>
+        <div className="sti"><span>ガチャチケット</span><strong>{wallet.gacha_tickets}</strong></div>
+        <div className="stst">表示・連携</div>
+        <div className="sti"><span>動画保存</span><strong>{SB_READY ? 'クラウド対応' : 'ローカルのみ'}</strong></div>
+        <div className="sti"><span>広告・特典</span><strong>{REWARD_ADS_ENABLED ? '有効' : '準備中'}</strong></div>
+        <div className="sti"><span>アフィリエイト表示</span><button className={"tog ".concat(sett.affOn ? 'on' : 'off')} onClick={() => setSett(s => ({ ...s, affOn: !s.affOn }))} /></div>
+        <div className="sti"><span>復習広告</span><button className={"tog ".concat(sett.rewOn ? 'on' : 'off')} onClick={() => setSett(s => ({ ...s, rewOn: !s.rewOn }))} /></div>
+        <button className="bg" onClick={() => setShowRanking(true)}>ランキングを見る</button>
+        {authUser ? <button className="bg" onClick={async () => { await supabaseAuth.signOut(); if (typeof window !== 'undefined') window.location.reload(); }}>ログアウト</button> : <button className="bp" onClick={loginWithGoogle}>Googleでログイン</button>}
       </div>
     </div>;
   };

@@ -84,9 +84,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   ];
 
   const generatedRows: any[] = [];
-  for (let i = 0; i < allowedGeneratedTarget; i += 1) {
+  const generatedSeen = new Set(rows.map((r: any) => String(r.id || r.sentence || '')));
+  for (let i = 0; generatedRows.length < allowedGeneratedTarget && i < allowedGeneratedTarget * 4; i += 1) {
     const generated = await generateGrammarQuestion(String(userId));
-    if (generated) generatedRows.push(generated);
+    const key = String(generated?.id || generated?.sentence || '');
+    if (generated && key && !generatedSeen.has(key)) {
+      generatedSeen.add(key);
+      generatedRows.push(generated);
+    }
   }
 
   const dbSeed = uniqueById([

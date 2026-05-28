@@ -1295,7 +1295,10 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
           }}>{word.en} OK</div>}</div> : /*#__PURE__*/<div key={word.id} className="ws-word" style={{
           left: "".concat(word.x, "%"),
           animationDuration: wsSlowed ? '18s' : '9s',
-          animationDelay: "".concat(idx * .35, "s")
+          animationDelay: (() => {
+            const elapsedMs = Math.max(0, Date.now() - Number(word.startedAt || Date.now()) - Number(word.delayMs || 0));
+            return elapsedMs > 0 ? "-".concat(elapsedMs / 1000, "s") : "".concat(Number(word.delayMs || idx * 350) / 1000, "s");
+          })()
         }} onAnimationEnd={() => handleWsChoice('__timeout__', word.id)}>{/*#__PURE__*/<div className="ws-word-en">{wsSkills.hint > 0 ? /*#__PURE__*/<>{/*#__PURE__*/<span style={{
               color: '#FCD34D',
               textDecoration: 'underline'
@@ -1915,7 +1918,9 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
       id: "".concat(Date.now(), "-").concat(slot, "-").concat(Math.random().toString(36).slice(2, 7)),
       en: word.en,
       jp: word.jp,
-      x: lanes[slot % lanes.length] + (Math.random() * 8 - 4)
+      x: lanes[slot % lanes.length] + (Math.random() * 8 - 4),
+      startedAt: Date.now(),
+      delayMs: slot * 350
     };
   };
   const makeChoices = (correct, pool) => {

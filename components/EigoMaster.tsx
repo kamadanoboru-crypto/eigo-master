@@ -523,11 +523,8 @@ function EigoMasterInner() {
             return newOnes.length > 0 ? [...newOnes, ...prev] : prev;
           });
         }
-        if (Array.isArray(vVotes) && vVotes.length > 0) {
-          setVideoVotes(prev => ({
-            ...prev,
-            ...Object.fromEntries(vVotes.map((row, __idx) => [row.video_id, Number(row.vote_type)]))
-          }));
+        if (Array.isArray(vVotes)) {
+          setVideoVotes(Object.fromEntries(vVotes.map((row, __idx) => [row.video_id, Number(row.vote_type)])));
         }
         setDbReady(true);
       } catch (e) {
@@ -1219,6 +1216,16 @@ function EigoMasterInner() {
     setTQs(enriched.map(shuffleQuestionOptions));
     if (!(await chargeStartedMode('practice', options))) resetQuizState('grammarHub');
   };
+  const mergeGrammarQuestionsIntoList = questions => {
+    const rows = (Array.isArray(questions) ? questions : []).filter(q => q && q.id && !String(q.id).startsWith('fallback-'));
+    if (!rows.length) return;
+    setGrammarList(prev => {
+      const seen = new Set(prev.map(q => String(q.id)));
+      const added = rows.filter(q => !seen.has(String(q.id)));
+      return added.length ? [...added, ...prev] : prev;
+    });
+    setGrammarListPage(0);
+  };
   const startGrammarDbTest = async () => {
     var _qs__meta_plan, _qs__meta, _qs__meta_plan1, _qs__meta1;
     if (!canStartPaidMode(COIN_COSTS.TEST)) return;
@@ -1233,6 +1240,7 @@ function EigoMasterInner() {
     setGrammarMode('test');
     resetQuizState('grammarTest');
     setTQs(nextQuestions.map(shuffleQuestionOptions));
+    mergeGrammarQuestionsIntoList(nextQuestions);
     if (!(await chargeStartedMode('test'))) resetQuizState('grammarHub');
     fetchGrammarList(userId).then(rows => {
       setGrammarList(rows);
@@ -1258,6 +1266,7 @@ function EigoMasterInner() {
       const shuffledQs = qs.map(shuffleQuestionOptions);
       if (type === "wordTest") rememberGeneratedQuestions('word', shuffledQs);
       if (type === "listeningTest") rememberGeneratedQuestions('listening', shuffledQs);
+      if (type === "grammarTest") mergeGrammarQuestionsIntoList(shuffledQs);
       resetQuizState(type);
       setTQs(shuffledQs);
       if (!isFree && !(await chargeStartedMode(mode))) resetQuizState('studyHub');
@@ -2252,7 +2261,8 @@ function EigoMasterInner() {
     }
   };
   const voteSharedVideo = async (videoId, vote) => {
-    const current = videoVotes[videoId];
+    const targetVideo = videos.find(v => v.videoId === videoId);
+    const current = SB_READY && !Number(targetVideo?.likes || targetVideo?.like_count || targetVideo?.dislikes || targetVideo?.dislike_count || 0) ? 0 : videoVotes[videoId];
     const nextVote = vote;
     const applyCounts = (likes, dislikes) => {
       setVideos(prev => prev.map((v, __idx) => v.videoId === videoId ? {
@@ -2294,7 +2304,7 @@ function EigoMasterInner() {
       });
       const d = await r.json().catch(() => ({}));
       if (r.ok && d.ok) {
-        applyCounts(Number(d.likes || 0), Number(d.dislikes || 0));
+        if (typeof d.likes === 'number' && typeof d.dislikes === 'number') applyCounts(Number(d.likes), Number(d.dislikes));
         setVideoVotes(prev => ({
           ...prev,
           [videoId]: d.vote
