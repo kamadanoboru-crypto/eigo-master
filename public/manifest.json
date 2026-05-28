@@ -1,7 +1,7 @@
 {
-  "name": "English Base - 英語学習基地",
-  "short_name": "English Base",
-  "description": "AI字幕・対訳・単語テスト・ガチャで毎日英語を続けよう",
+  "name": "Eigo Master - AIと動画で続ける英語学習",
+  "short_name": "Eigo Master",
+  "description": "英単語・英文法・動画学習・AI会話練習を組み合わせた英語学習支援サービスです。",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F8FAFC",

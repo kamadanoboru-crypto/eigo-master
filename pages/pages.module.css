@@ -12,6 +12,7 @@
   padding: 1rem 1.5rem;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
@@ -26,6 +27,24 @@
 
 .logo:hover {
   color: #1d4ed8;
+}
+
+.nav {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.nav a {
+  color: #334155;
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.nav a:hover {
+  color: #2563eb;
 }
 
 .main {
@@ -99,6 +118,217 @@
 
 .article a:hover {
   color: #1d4ed8;
+}
+
+.hero {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 3rem 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.hero h1 {
+  font-size: 2.4rem;
+  line-height: 1.25;
+  margin: 0 0 1rem;
+  color: #0f172a;
+}
+
+.hero p {
+  color: #475569;
+  line-height: 1.9;
+  max-width: 760px;
+}
+
+.kicker {
+  color: #2563eb;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.5rem;
+}
+
+.heroActions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+
+.primaryButton,
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 0;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.secondaryButton {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+}
+
+.section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.8;
+}
+
+.section h2 {
+  color: #0f172a;
+  font-size: 1.55rem;
+  margin: 0 0 1rem;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.infoCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #f8fafc;
+}
+
+.infoCard h3 {
+  margin: 0 0 0.5rem;
+  color: #1e293b;
+}
+
+.infoCard p {
+  margin: 0;
+  color: #475569;
+}
+
+.checkList {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.checkList li {
+  margin-bottom: 0.75rem;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.steps div {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #f8fafc;
+}
+
+.steps strong,
+.steps span {
+  display: block;
+}
+
+.steps strong {
+  color: #2563eb;
+  margin-bottom: 0.35rem;
+}
+
+.faqList {
+  display: grid;
+  gap: 1rem;
+}
+
+.faqList div {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1rem;
+}
+
+.faqList h3 {
+  margin: 0 0 0.5rem;
+  color: #1e293b;
+}
+
+.textLink {
+  color: #2563eb;
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px solid #2563eb;
+}
+
+.blogList {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.blogCard {
+  display: block;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.25rem;
+  background: #f8fafc;
+  color: inherit;
+  text-decoration: none;
+}
+
+.blogCard h2 {
+  border-left: 0;
+  padding-left: 0;
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+
+.blogCard p {
+  color: #475569;
+  margin-bottom: 0.75rem;
+}
+
+.blogCard span {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.contactBox {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+.appLoading {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+
+.appLoadingTitle {
+  font-size: 1.5rem;
+  font-weight: 800;
 }
 
 .notice {
@@ -246,6 +476,32 @@
 
 /* モバイル対応 */
 @media (max-width: 640px) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .nav {
+    justify-content: flex-start;
+  }
+
+  .hero {
+    padding: 2rem 1.25rem;
+  }
+
+  .hero h1 {
+    font-size: 1.85rem;
+  }
+
+  .section {
+    padding: 1.25rem;
+  }
+
+  .cardGrid,
+  .steps {
+    grid-template-columns: 1fr;
+  }
+
   .article {
     padding: 1.5rem;
   }

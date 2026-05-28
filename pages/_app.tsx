@@ -9,13 +9,13 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         <meta name="theme-color" content="#2563EB" />
-        <meta name="description" content="YouTube動画・BBCニュースで英語を語順のまま理解する学習アプリ" />
+        <meta name="description" content="Eigo Masterは、英単語・英文法・動画学習・AI会話練習を組み合わせた英語学習支援サービスです。" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="English Base" />
+        <meta name="apple-mobile-web-app-title" content="Eigo Master" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-        <title>English Base</title>
+        <title>Eigo Master</title>
       </Head>
 
       <Component {...pageProps} />
