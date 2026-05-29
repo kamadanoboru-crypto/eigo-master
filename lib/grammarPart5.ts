@@ -55,19 +55,33 @@ export const FALLBACK_GRAMMAR = [
 ];
 
 export function normalizeGrammarQuestion(q: any) {
-  const sentence = String(q?.s ?? q?.sentence ?? '').trim();
+  const sentence = String(q?.s ?? q?.sentence ?? '').trim().replace(/_{3,}/g, '_____');
+  const blankCount = (sentence.match(/_____/g) ?? []).length;
   const options = Array.isArray(q?.options) ? q.options.map(String).map(s => s.trim()).filter(Boolean) : [];
   const correct = String(q?.correct ?? q?.ans ?? '').trim();
-  if (!sentence.includes('_____') || options.length !== 4 || !options.includes(correct)) return null;
+  const uniqueOptions = [...new Set(options)];
+  if (/\bto\s+_____/.test(sentence) && /^to\b/i.test(correct)) return null;
+  if (blankCount !== 1 || uniqueOptions.length !== 4 || !uniqueOptions.includes(correct)) return null;
   return {
     s: sentence,
     ja: String(q?.ja ?? q?.jp ?? '').trim(),
-    options,
+    options: uniqueOptions,
     correct,
     ans: correct,
     exp: String(q?.exp ?? q?.explanation ?? '').trim() || '正解の語句が文法・語法上もっとも自然です。',
     cat: String(q?.cat ?? q?.category ?? '').trim() || 'TOEIC Part 5',
   };
+}
+
+export function isUsableGrammarRow(row: any) {
+  return Boolean(normalizeGrammarQuestion({
+    sentence: row?.sentence ?? row?.s,
+    ja: row?.ja,
+    options: row?.options,
+    correct: row?.correct,
+    exp: row?.explanation ?? row?.exp,
+    cat: row?.category ?? row?.cat,
+  }));
 }
 
 export function toQuestionRow(q: any, createdBy = '') {
@@ -83,6 +97,18 @@ export function toQuestionRow(q: any, createdBy = '') {
     level: 'level_600',
     source: q?.source || 'toeic',
     created_by: createdBy || null,
+  };
+}
+
+export function toTransientQuestionRow(q: any, createdBy = '') {
+  const row = toQuestionRow(q, createdBy);
+  if (!row) return null;
+  return {
+    ...row,
+    id: `fallback-ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    question_no: null,
+    source: 'ai_unsaved',
+    created_at: new Date().toISOString(),
   };
 }
 
@@ -163,19 +189,45 @@ export async function seedFallbackQuestions(userId = '') {
 }
 
 export async function generateGrammarQuestion(userId = '') {
-  const prompt = `Create one natural TOEIC Part 5 multiple-choice question for Japanese learners.
-Match intermediate TOEIC level 600. Use natural business or daily workplace English.
-Include a grammar category such as tense, preposition, conjunction, passive voice, infinitive, participle, or vocabulary.
-Avoid awkward English, trivia, and ambiguous answers.
-Return JSON only:
-{"s":"English sentence with _____","ja":"natural Japanese translation","options":["correct","wrong1","wrong2","wrong3"],"correct":"correct","exp":"Japanese explanation","cat":"grammar category","source":"ai"}`;
+  const prompt = `Create exactly ONE valid TOEIC Part 5 multiple-choice question for Japanese learners.
+
+Hard requirements:
+- Return one JSON object only. Do not wrap it in markdown.
+- The "s" field MUST be one natural English sentence containing exactly one blank marker: _____
+- The word or phrase in "correct" MUST NOT appear in the sentence outside the blank.
+- "options" MUST contain exactly 4 real answer choices as strings.
+- "correct" MUST be exactly one of the 4 strings in "options".
+- Do NOT use placeholder values such as "correct", "wrong1", "wrong2", or "wrong3".
+- Do NOT copy the sample JSON sentence or answer choices below.
+- Do NOT generate any of these existing seed sentences:
+  1. The meeting has been _____ until next Friday.
+  2. The report must be submitted _____ Friday.
+  3. Employees are required to _____ time sheets.
+  4. The manager is responsible _____ the team.
+  5. Sales figures _____ significantly this year.
+  6. _____ the budget cuts, the project continued.
+  7. Please contact us _____ you have questions.
+  8. The new policy will take _____ on April 1st.
+- Make all 3 wrong choices plausible but clearly incorrect.
+- Match TOEIC 600 level business or workplace English.
+- Focus on one grammar point: tense, preposition, conjunction, passive voice, infinitive, participle, or vocabulary.
+- Avoid trivia, ambiguous answers, and awkward English.
+- Write "ja" and "exp" in natural Japanese.
+- If the blank already follows "to", do not make a "to ..." phrase the correct answer.
+- If the blank needs an infinitive phrase, write the sentence so the blank does not already follow "to".
+
+Return this exact JSON shape with original real content:
+{"s":"All expense reports must be approved _____ the finance manager.","ja":"すべての経費報告書は財務マネージャーによって承認されなければなりません。","options":["by","for","with","from"],"correct":"by","exp":"受動態で行為者を表す場合は by を使います。","cat":"preposition","source":"ai"}`;
   try {
-    const raw = await callAI(prompt, 900, 'Return valid JSON only.');
+    const raw = await callAI(prompt, 700, 'You generate strict JSON for TOEIC Part 5. Output exactly one JSON object and obey every validation rule.');
     const parsed = parseJSON<any>(raw, null);
     const row = toQuestionRow(parsed, userId);
     if (row) {
       const inserted = await sbPost('grammar_questions?on_conflict=sentence', row, 'return=representation,resolution=ignore-duplicates');
       if (Array.isArray(inserted) && inserted[0]) return inserted[0];
+      const existing = await sbGet(`grammar_questions?select=*&sentence=eq.${encodeURIComponent(row.sentence)}&limit=1`);
+      if (Array.isArray(existing) && existing[0]) return existing[0];
+      return toTransientQuestionRow(parsed, userId);
     }
   } catch (e) {
     console.error('[grammar] generate failed', e);

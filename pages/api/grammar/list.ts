@@ -1,6 +1,6 @@
 // @ts-nocheck
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { applyQuestionQuality, sbGet, seedFallbackQuestions, rowToQuestion } from '../../../lib/grammarPart5';
+import { applyQuestionQuality, isUsableGrammarRow, sbGet, seedFallbackQuestions, rowToQuestion } from '../../../lib/grammarPart5';
 
 function latestByQuestion(attempts: any[]) {
   const map = new Map<string, any>();
@@ -17,6 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const userId = String(req.query.userId ?? '');
   let rows = await sbGet('grammar_questions?select=*&order=question_no.asc&limit=200');
   if (!rows.length) rows = await seedFallbackQuestions(userId);
+  rows = rows.filter(isUsableGrammarRow);
 
   const ids = rows.map((r: any) => r.id).filter(Boolean);
   const dbIds = ids.filter((id: string) => !String(id).startsWith('fallback-'));

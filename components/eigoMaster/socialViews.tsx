@@ -384,9 +384,7 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
   const UnlockModal = () => {
     if (!unlockModal) return null;
     const coinCost = unlockModal.coinCost ?? COIN_COSTS.AI ?? 5;
-    const ticketCost = unlockModal.ticketCost ?? 1;
     const canCoin = wallet.coins >= coinCost;
-    const canTicket = wallet.gacha_tickets >= ticketCost;
     return <div className="unlock-modal-overlay" onClick={() => setUnlockModal(null)}>
       <div className="unlock-modal" onClick={e => e.stopPropagation()}>
         <div style={{
@@ -400,7 +398,7 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
           color: "var(--t2)",
           lineHeight: 1.7,
           textAlign: "center"
-        }}>{unlockModal.message || "コインまたはチケットで続行できます。"}</div>
+        }}>{unlockModal.message || "コインで続行できます。"}</div>
         <div className="unlock-price">
           <button className="unlock-price-opt" disabled={!canCoin} onClick={() => unlockModal.onConfirm?.("coin")}>
             <div className="unlock-badge unlock-badge-coin">🪙 コイン</div>
@@ -408,13 +406,6 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
               marginTop: 6,
               fontWeight: 800
             }}>{coinCost}</div>
-          </button>
-          <button className="unlock-price-opt" disabled={!canTicket} onClick={() => unlockModal.onConfirm?.("ticket")}>
-            <div className="unlock-badge unlock-badge-ticket">🎟 チケット</div>
-            <div style={{
-              marginTop: 6,
-              fontWeight: 800
-            }}>{ticketCost}</div>
           </button>
         </div>
         <button className="bg" style={{
@@ -668,7 +659,6 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         <div className="sti"><span>直近リスニング</span><strong>{pct(lastListening)}</strong></div>
         <div className="stst">ウォレット</div>
         <div className="sti"><span>コイン</span><strong>{wallet.coins}</strong></div>
-        <div className="sti"><span>ガチャチケット</span><strong>{wallet.gacha_tickets}</strong></div>
         <div className="stst">データ連携</div>
         <div className="sti"><span>保存状態</span><strong>{SB_READY ? 'クラウド同期' : 'ローカル保存'}</strong></div>
         <button className="bg" onClick={() => setShowRanking(true)}>ランキングを見る</button>

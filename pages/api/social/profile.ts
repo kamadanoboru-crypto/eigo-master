@@ -39,11 +39,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!SB_URL) return res.status(200).json({ ok: true });
 
-    await fetch(`${SB_URL}/rest/v1/profiles`, {
+    await fetch(`${SB_URL}/rest/v1/profiles?on_conflict=user_id`, {
       method: 'POST',
       headers: { ...headers(), Prefer: 'return=minimal,resolution=merge-duplicates' },
       body: JSON.stringify({ user_id: userId, nickname: nickname.trim(), avatar_emoji: avatarEmoji ?? '🎓', updated_at: new Date().toISOString() }),
     });
+    await fetch(`${SB_URL}/rest/v1/talk_posts?user_id=eq.${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      headers: { ...headers(), Prefer: 'return=minimal' },
+      body: JSON.stringify({ nickname: nickname.trim(), avatar_emoji: avatarEmoji ?? '🎓' }),
+    }).catch(() => {});
     return res.status(200).json({ ok: true });
   }
 

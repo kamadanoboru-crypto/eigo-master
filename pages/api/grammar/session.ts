@@ -1,11 +1,11 @@
 // @ts-nocheck
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { applyQuestionQuality, generateGrammarQuestion, rowToQuestion, sbGet, seedFallbackQuestions, shuffle, weightedShuffleByQuality } from '../../../lib/grammarPart5';
+import { applyQuestionQuality, generateGrammarQuestion, isUsableGrammarRow, rowToQuestion, sbGet, seedFallbackQuestions, shuffle, weightedShuffleByQuality } from '../../../lib/grammarPart5';
 
 async function getRows(userId: string) {
   let rows = await sbGet('grammar_questions?select=*&order=question_no.asc&limit=300');
   if (!rows.length) rows = await seedFallbackQuestions(userId);
-  return rows;
+  return rows.filter(isUsableGrammarRow);
 }
 
 function uniqueById(rows: any[]) {
@@ -44,24 +44,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ questions: row ? [row, ...fill].slice(0, safeCount).map(rowToQuestion) : [] });
   }
 
-  if (mode === 'practice') {
-    const attempts = userId
-      ? await sbGet(`grammar_attempts?select=*&user_id=eq.${encodeURIComponent(String(userId))}&order=created_at.desc&limit=2000`)
-      : [];
-    const latest = new Map<string, any>();
-    attempts.forEach((a: any) => {
-      if (!latest.has(a.question_id)) latest.set(a.question_id, a);
-    });
-    const untouchedRows = rows.filter((r: any) => !latest.has(r.id));
-    const wrongRows = rows.filter((r: any) => latest.get(r.id)?.is_correct === false);
-    const selected = uniqueById([
-      ...weightedShuffleByQuality(untouchedRows),
-      ...weightedShuffleByQuality(wrongRows),
-      ...weightedShuffleByQuality(rows),
-    ]).slice(0, safeCount);
-    return res.status(200).json({ questions: selected.map(rowToQuestion) });
-  }
-
   const attempts = userId
     ? await sbGet(`grammar_attempts?select=*&user_id=eq.${encodeURIComponent(String(userId))}&order=created_at.desc&limit=2000`)
     : [];
@@ -74,8 +56,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   });
 
-  const existingTarget = mode === 'test' ? Math.min(6, safeCount) : safeCount;
-  const generatedTarget = mode === 'test' ? Math.max(0, safeCount - existingTarget) : 0;
+  const generatedTarget = safeCount > 0 ? 1 : 0;
+  const existingTarget = Math.max(0, safeCount - generatedTarget);
   const baseRows = rows;
   const wrongRows = baseRows.filter((r: any) => latest.get(r.id)?.is_correct === false);
   const untouchedRows = baseRows.filter((r: any) => !latest.has(r.id));
@@ -102,8 +84,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (generatedRows.length < generatedTarget) {
     return res.status(200).json({
       ok: false,
-      error: 'AI新規問題を必要数生成できませんでした。コインは消費されません。',
-      questions: [],
+      error: 'AI新規問題を生成できませんでした。既存問題で開始します。コインは消費されません。',
+      questions: uniqueBySentence([...dbRows, ...generatedRows]).slice(0, safeCount).map(rowToQuestion),
       fallbackQuestions: dbRows.map(rowToQuestion),
       plan: {
         existingTarget,
@@ -129,3 +111,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     },
   });
 }
+

@@ -21,6 +21,23 @@ function hdrs() {
   };
 }
 
+async function applyProfiles(posts: any[]) {
+  if (!Array.isArray(posts) || posts.length === 0) return [];
+  const ids = Array.from(new Set(posts.map(post => String(post.user_id || '')).filter(Boolean)));
+  if (!ids.length) return posts;
+  const r = await fetch(
+    `${SB_URL}/rest/v1/profiles?select=user_id,nickname,avatar_emoji&user_id=in.(${ids.map(encodeURIComponent).join(',')})`,
+    { headers: hdrs(), signal: AbortSignal.timeout(5000) }
+  );
+  if (!r.ok) return posts;
+  const profiles = await r.json().catch(() => []);
+  const byId = new Map((Array.isArray(profiles) ? profiles : []).map((p: any) => [String(p.user_id), p]));
+  return posts.map(post => {
+    const profile = byId.get(String(post.user_id));
+    return profile ? { ...post, nickname: profile.nickname || post.nickname, avatar_emoji: profile.avatar_emoji || post.avatar_emoji } : post;
+  });
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!SB_READY) return res.status(503).json({ ok: false, reason: 'no-supabase' });
 
@@ -35,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           `${SB_URL}/rest/v1/talk_posts?select=id,user_id,nickname,avatar_emoji,body,category,parent_id,thread_id,like_count,dislike_count,reply_count,created_at&thread_id=eq.${encodeURIComponent(threadId)}&parent_id=not.is.null&order=created_at.asc&limit=${limit}&offset=${offset}`,
           { headers: hdrs(), signal: AbortSignal.timeout(5000) }
         );
-        if (r.ok) return res.status(200).json({ ok: true, posts: await r.json() });
+        if (r.ok) return res.status(200).json({ ok: true, posts: await applyProfiles(await r.json()) });
       }
 
       const r = await fetch(
@@ -49,10 +66,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
         if (!fallback.ok) return res.status(200).json({ ok: false, posts: [] });
         const fallbackRows = await fallback.json();
-        return res.status(200).json({ ok: true, posts: Array.isArray(fallbackRows) ? fallbackRows : [] });
+        return res.status(200).json({ ok: true, posts: await applyProfiles(Array.isArray(fallbackRows) ? fallbackRows : []) });
       }
       const rows = await r.json();
-      return res.status(200).json({ ok: true, posts: Array.isArray(rows) ? rows : [] });
+      return res.status(200).json({ ok: true, posts: await applyProfiles(Array.isArray(rows) ? rows : []) });
     } catch (e) {
       console.error('[talk/GET]', e.message);
       return res.status(200).json({ ok: false, posts: [] });

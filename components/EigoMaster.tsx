@@ -437,7 +437,7 @@ function EigoMasterInner() {
     const load = async () => {
       try {
         const uid = "user_id=eq.".concat(userId);
-        const [sLines, myL, tRes, uPts, uVids, captionRows, vVotes] = await Promise.all([sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.caption&order=saved_at.desc")), fetch("/api/list/get?userId=".concat(encodeURIComponent(userId))).then(r => r.json()), sbFrom("learning_logs").select("*&".concat(uid, "&order=created_at.asc")), sbFrom("user_points").select("*&".concat(uid)), sbFrom("user_videos").select("*&order=added_at.desc&limit=100"), sbFrom("video_captions").select("select=video_id&limit=1000"), sbFrom("video_votes").select("select=video_id,vote_type&user_id=eq.".concat(encodeURIComponent(userId), "&limit=1000"))]);
+        const [sLines, myL, tRes, uPts, uVids, captionRows, vVotes, allVideoVotes] = await Promise.all([sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.caption&order=saved_at.desc")), fetch("/api/list/get?userId=".concat(encodeURIComponent(userId))).then(r => r.json()), sbFrom("learning_logs").select("*&".concat(uid, "&order=created_at.asc")), sbFrom("user_points").select("*&".concat(uid)), sbFrom("user_videos").select("*&order=added_at.desc&limit=100"), sbFrom("video_captions").select("select=video_id&limit=1000"), sbFrom("video_votes").select("select=video_id,vote_type&user_id=eq.".concat(encodeURIComponent(userId), "&limit=1000")), sbFrom("video_votes").select("select=video_id,vote_type&limit=10000")]);
         // saved_items から保存済み文を復元（Phase3: 永続化）
         if (Array.isArray(sLines) && sLines.length > 0) {
           setSaved(sLines.map((r, __idx) => {
@@ -502,25 +502,66 @@ function EigoMasterInner() {
         if (Array.isArray(uPts) && uPts.length > 0) {
           setPts(uPts[0].points);
         }
+        const videoVoteCounts = new Map();
+        if (Array.isArray(allVideoVotes)) {
+          allVideoVotes.forEach(row => {
+            const id = String((row === null || row === void 0 ? void 0 : row.video_id) || '');
+            if (!id) return;
+            const cur = videoVoteCounts.get(id) || {
+              likes: 0,
+              dislikes: 0
+            };
+            if (Number(row.vote_type) === 1) cur.likes += 1;
+            if (Number(row.vote_type) === -1) cur.dislikes += 1;
+            videoVoteCounts.set(id, cur);
+          });
+        }
+        const withVoteCounts = v => {
+          const counts = videoVoteCounts.get(v.videoId);
+          if (!counts) return v;
+          return {
+            ...v,
+            likes: counts.likes,
+            dislikes: counts.dislikes,
+            like_count: counts.likes,
+            dislike_count: counts.dislikes
+          };
+        };
+        if (videoVoteCounts.size > 0) setVideos(prev => prev.map(withVoteCounts));
         // user_videos: 共有動画としてAll Videosへマージ（端末依存/localStorage依存を減らす）
         if (Array.isArray(uVids) && uVids.length > 0) {
           const readyVideoIds = new Set((Array.isArray(captionRows) ? captionRows : []).map((r, __idx) => r.video_id));
-          const userVids = uVids.map((r, __idx) => ({
-            videoId: r.video_id,
-            title: r.title,
-            channelTitle: r.channel_title,
-            thumbnail: r.thumbnail,
-            aiReady: readyVideoIds.has(r.video_id),
-            hasTranslation: readyVideoIds.has(r.video_id),
-            shared: r.user_id !== userId,
-            addedAt: r.added_at,
-            likes: Number(r.like_count || 0),
-            dislikes: Number(r.dislike_count || 0)
-          }));
+          const userVids = uVids.map((r, __idx) => {
+            const counts = videoVoteCounts.get(r.video_id);
+            return {
+              videoId: r.video_id,
+              title: r.title,
+              channelTitle: r.channel_title,
+              thumbnail: r.thumbnail,
+              aiReady: readyVideoIds.has(r.video_id),
+              hasTranslation: readyVideoIds.has(r.video_id),
+              shared: r.user_id !== userId,
+              addedAt: r.added_at,
+              likes: counts ? counts.likes : Number(r.like_count || 0),
+              dislikes: counts ? counts.dislikes : Number(r.dislike_count || 0)
+            };
+          });
           setVideos(prev => {
-            const existingIds = new Set(prev.map((v, __idx) => v.videoId));
-            const newOnes = userVids.filter(v => !existingIds.has(v.videoId));
-            return newOnes.length > 0 ? [...newOnes, ...prev] : prev;
+            const byId = new Map(userVids.map(v => [v.videoId, v]));
+            const merged = prev.map(v => {
+              const row = byId.get(v.videoId);
+              if (!row) return v;
+              byId.delete(v.videoId);
+              return {
+                ...v,
+                ...row,
+                likes: Number(row.likes || row.like_count || 0),
+                dislikes: Number(row.dislikes || row.dislike_count || 0),
+                like_count: Number(row.likes || row.like_count || 0),
+                dislike_count: Number(row.dislikes || row.dislike_count || 0)
+              };
+            });
+            return [...Array.from(byId.values()), ...merged];
           });
         }
         if (Array.isArray(vVotes)) {
@@ -1235,6 +1276,7 @@ function EigoMasterInner() {
       coins: qs._meta.plan.remaining
     }));
     if ((_qs__meta1 = qs._meta) === null || _qs__meta1 === void 0 ? void 0 : (_qs__meta_plan1 = _qs__meta1.plan) === null || _qs__meta_plan1 === void 0 ? void 0 : _qs__meta_plan1.aiCost) t$("Part5 AI -".concat(qs._meta.plan.aiCost, " coins"), 'info');
+    if ((qs === null || qs === void 0 ? void 0 : qs._meta) && qs._meta.ok === false) t$('Part5 AI generation failed. Existing questions only.', 'warn');
     if (!qs.length) {
       t$('AI新規問題を生成できませんでした。コインは消費されません。', 'warn');
       return;
@@ -1270,6 +1312,7 @@ function EigoMasterInner() {
           coins: qs._meta.plan.remaining
         }));
       }
+      if (type === "grammarTest" && (qs === null || qs === void 0 ? void 0 : qs._meta) && qs._meta.ok === false) t$('Part5 AI generation failed. Existing questions only.', 'warn');
       const shuffledQs = qs.map(shuffleQuestionOptions);
       if (type === "wordTest") rememberGeneratedQuestions('word', shuffledQs);
       if (type === "listeningTest") rememberGeneratedQuestions('listening', shuffledQs);
@@ -2268,8 +2311,7 @@ function EigoMasterInner() {
     }
   };
   const voteSharedVideo = async (videoId, vote) => {
-    const targetVideo = videos.find(v => v.videoId === videoId);
-    const current = SB_READY && !Number(targetVideo?.likes || targetVideo?.like_count || targetVideo?.dislikes || targetVideo?.dislike_count || 0) ? 0 : videoVotes[videoId];
+    const current = Number(videoVotes[videoId] || 0);
     const nextVote = vote;
     const applyCounts = (likes, dislikes) => {
       setVideos(prev => prev.map((v, __idx) => v.videoId === videoId ? {
