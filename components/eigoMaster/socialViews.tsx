@@ -425,19 +425,25 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
   };
   const Talk = () => {
     const categories = [
-      { id: 'general', label: '学習相談' },
-      { id: 'toeic', label: 'TOEIC' },
-      { id: 'grammar', label: '文法' },
-      { id: 'vocabulary', label: '単語' },
-      { id: 'listening', label: 'リスニング' },
-      { id: 'translation', label: '翻訳' }
+      { id: 'general', label: '学習相談', color: '#183153' },
+      { id: 'toeic', label: 'TOEIC', color: '#B88932' },
+      { id: 'grammar', label: '文法', color: '#0F766E' },
+      { id: 'vocabulary', label: '単語', color: '#6D5BD0' },
+      { id: 'listening', label: 'リスニング', color: '#0369A1' },
+      { id: 'translation', label: '翻訳', color: '#B45309' }
     ];
     const [posts, setPosts] = React.useState([]);
+    const [title, setTitle] = React.useState('');
     const [body, setBody] = React.useState('');
     const [category, setCategory] = React.useState('general');
     const [sortMode, setSortMode] = React.useState('popular');
     const [editing, setEditing] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
+    const splitPost = post => {
+      const text = String(post?.body || '');
+      const m = text.match(/^# (.+)\n([\s\S]*)$/);
+      return m ? { title: m[1], body: m[2] } : { title: '学習メモ', body: text };
+    };
     const loadPosts = React.useCallback(async () => {
       setLoading(true);
       try {
@@ -460,13 +466,15 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
       return scoreB - scoreA || new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
     });
     const submitPost = async () => {
-      if (!body.trim()) return;
+      const nextTitle = title.trim() || '学習メモ';
+      const nextBody = body.trim();
+      if (!nextBody) return;
       const temp = {
         id: 'local-' + Date.now(),
         user_id: userId,
         nickname: myProfile?.nickname || 'Guest',
-        avatar_emoji: myProfile?.avatar_emoji || '',
-        body: body.trim(),
+        avatar_emoji: myProfile?.avatar_emoji || 'EB',
+        body: `# ${nextTitle}\n${nextBody}`,
         category,
         like_count: 0,
         dislike_count: 0,
@@ -474,12 +482,13 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         created_at: new Date().toISOString()
       };
       setPosts(prev => [temp, ...prev]);
+      setTitle('');
       setBody('');
       try {
         const r = await fetch('/api/social/talk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, body: temp.body, category, nickname: myProfile?.nickname, avatarEmoji: myProfile?.avatar_emoji })
+          body: JSON.stringify({ userId, title: nextTitle, body: nextBody, category, nickname: myProfile?.nickname, avatarEmoji: myProfile?.avatar_emoji })
         });
         const d = await r.json().catch(() => ({}));
         if (d.ok && d.post) setPosts(prev => prev.map(p => p.id === temp.id ? d.post : p));
@@ -490,18 +499,22 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
     };
     const saveEdit = async post => {
       const nextBody = editing?.body?.trim();
+      const nextTitle = editing?.title?.trim() || '学習メモ';
       const nextCategory = editing?.category || 'general';
       if (!nextBody) return;
-      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, body: nextBody, category: nextCategory } : p));
+      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, body: `# ${nextTitle}\n${nextBody}`, category: nextCategory } : p));
       setEditing(null);
       try {
         const r = await fetch('/api/social/talk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'edit', postId: post.id, userId, body: nextBody, category: nextCategory })
+          body: JSON.stringify({ action: 'edit', postId: post.id, userId, title: nextTitle, body: nextBody, category: nextCategory })
         });
         const d = await r.json().catch(() => ({}));
-        if (d.ok && d.post) setPosts(prev => prev.map(p => p.id === post.id ? d.post : p));
+        if (d.ok && d.post) {
+          setPosts(prev => prev.map(p => p.id === post.id ? d.post : p));
+          loadPosts();
+        }
         else loadPosts();
       } catch (e) {
         loadPosts();
@@ -514,114 +527,126 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         dislike_count: Math.max(0, Number(p.dislike_count || 0) + (vote === -1 ? 1 : 0))
       } : p));
       try {
-        await fetch('/api/social/talk', {
+        const r = await fetch('/api/social/talk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'vote', postId: post.id, userId, vote })
         });
+        const d = await r.json().catch(() => ({}));
+        if (d.ok) setPosts(prev => prev.map(p => p.id === post.id ? { ...p, like_count: d.like_count, dislike_count: d.dislike_count } : p));
       } catch (e) {}
     };
     return <div className="sa" style={{ padding: 16 }}>
-      <div className="sc" style={{ marginBottom: 14 }}>
-        <div className="jp" style={{ fontWeight: 800, marginBottom: 8 }}>トークに投稿</div>
-        <select className="url-inp" value={category} onChange={e => setCategory(e.target.value)} style={{ width: '100%', marginBottom: 8 }}>{categories.map(cat => <option key={cat.id} value={cat.id}>{cat.label}</option>)}</select>
-        <textarea className="url-inp" value={body} onChange={e => setBody(e.target.value)} rows={3} placeholder="学習メモ・質問・気づきを書く" style={{ width: '100%', resize: 'vertical', marginBottom: 8 }} />
-        <button className="bp" style={{ width: '100%' }} onClick={submitPost}>投稿する</button>
-      </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         {[{ id: 'popular', label: '人気順' }, { id: 'new', label: '新着順' }].map(tab => <button key={tab.id} className="bg" style={{ flex: 1, background: sortMode === tab.id ? 'var(--p)' : 'var(--sur)', color: sortMode === tab.id ? '#fff' : 'var(--t2)' }} onClick={() => setSortMode(tab.id)}>{tab.label}</button>)}
+      </div>
+      <div className="sc" style={{ marginBottom: 14 }}>
+        <div className="jp" style={{ fontWeight: 800, marginBottom: 8 }}>学習トークを投稿</div>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 8 }}>
+          {categories.map(cat => <button key={cat.id} className="bg" style={{ padding: '7px 10px', whiteSpace: 'nowrap', borderColor: category === cat.id ? cat.color : 'var(--bd)', color: category === cat.id ? cat.color : 'var(--t2)' }} onClick={() => setCategory(cat.id)}>{cat.label}</button>)}
+        </div>
+        <input className="url-inp" value={title} onChange={e => setTitle(e.target.value)} placeholder="タイトル" style={{ width: '100%', marginBottom: 8 }} />
+        <textarea className="url-inp" value={body} onChange={e => setBody(e.target.value)} rows={3} placeholder="学習メモ・質問・気づきを書く" style={{ width: '100%', resize: 'vertical', marginBottom: 8 }} />
+        <button className="bp" style={{ width: '100%' }} onClick={submitPost}>投稿する</button>
       </div>
       {loading && <div className="empty">読み込み中...</div>}
       {!loading && sortedPosts.length === 0 && <div className="empty">まだ投稿がありません</div>}
       {!loading && sortedPosts.map((post, i) => {
         const isMine = post.user_id === userId;
         const isEditing = editing?.id === post.id;
-        const cat = categories.find(c => c.id === post.category)?.label || post.category || 'Study';
+        const cat = categories.find(c => c.id === post.category) || categories[0];
+        const parsed = splitPost(post);
         return <div key={post.id || i} className="sc" style={{ marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--pl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: 'var(--p)' }}>{post.avatar_emoji || 'EB'}</div>
             <div style={{ minWidth: 0 }}>
               <div className="jp" style={{ fontWeight: 800 }}>{post.nickname || post.user_id?.slice?.(0, 8) || 'Guest'}</div>
-              <div style={{ fontSize: 11, color: 'var(--t3)' }}>{post.created_at ? new Date(post.created_at).toLocaleDateString('ja-JP') : ''}</div>
+              <div style={{ fontSize: 11, color: 'var(--t3)' }}>{post.created_at ? new Date(post.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</div>
             </div>
-            <span className="strategy-chip sc-b">{cat}</span>
+            <span className="strategy-chip" style={{ background: cat.color + '18', color: cat.color }}>{cat.label}</span>
           </div>
           {isEditing ? <div style={{ display: 'grid', gap: 8 }}>
             <select className="url-inp" value={editing.category} onChange={e => setEditing(prev => ({ ...prev, category: e.target.value }))}>{categories.map(cat => <option key={cat.id} value={cat.id}>{cat.label}</option>)}</select>
+            <input className="url-inp" value={editing.title} onChange={e => setEditing(prev => ({ ...prev, title: e.target.value }))} />
             <textarea className="url-inp" value={editing.body} onChange={e => setEditing(prev => ({ ...prev, body: e.target.value }))} rows={3} />
-            <div style={{ display: 'flex', gap: 8 }}><button className="bp" onClick={() => saveEdit(post)}>Save</button><button className="bg" onClick={() => setEditing(null)}>Cancel</button></div>
-          </div> : <div className="jp" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, marginBottom: 10 }}>{post.body}</div>}
+            <div style={{ display: 'flex', gap: 8 }}><button className="bp" onClick={() => saveEdit(post)}>保存</button><button className="bg" onClick={() => setEditing(null)}>キャンセル</button></div>
+          </div> : <>
+            <div className="jp" style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>{parsed.title}</div>
+            <div className="jp" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, marginBottom: 10 }}>{parsed.body}</div>
+          </>}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button className="bg" onClick={() => votePost(post, 1)}>いいね {post.like_count || 0}</button>
-            <button className="bg" onClick={() => votePost(post, -1)}>うーん {post.dislike_count || 0}</button>
-            <span style={{ fontSize: 12, color: 'var(--t3)' }}>返信 {post.reply_count || 0}</span>
-            {isMine && !isEditing && <button className="bg" style={{ marginLeft: 'auto' }} onClick={() => setEditing({ id: post.id, body: post.body || '', category: post.category || 'general' })}>編集</button>}
+            <button className="bg" onClick={() => votePost(post, -1)}>わるいね {post.dislike_count || 0}</button>
+            <span style={{ fontSize: 12, color: 'var(--t3)' }}>回答 {post.reply_count || 0}</span>
+            {isMine && !isEditing && <button className="bg" style={{ marginLeft: 'auto' }} onClick={() => setEditing({ id: post.id, title: parsed.title, body: parsed.body, category: post.category || 'general' })}>編集</button>}
           </div>
         </div>;
       })}
     </div>;
   };
-  const RankingScreen = () => <div className="sa" style={{
-    padding: 16
-  }}>
-    <div style={{
-      display: "flex",
-      gap: 8,
-      marginBottom: 12
-    }}>
-      {["learning", "translation"].map((tab, __idx) => <button key={tab} className="bg" style={{
-        flex: 1,
-        background: rankingTab === tab ? "var(--p)" : "var(--sur)",
-        color: rankingTab === tab ? "#fff" : "var(--t2)"
-      }} onClick={() => loadRanking(tab, rankingPeriod)}>{tab === "learning" ? "Learning" : "Translation"}</button>)}
-    </div>
-    <div style={{
-      display: "flex",
-      gap: 8,
-      marginBottom: 14
-    }}>
-      {["weekly", "monthly", "all"].map((period, __idx) => <button key={period} className="bg" style={{
-        flex: 1,
-        borderColor: rankingPeriod === period ? "var(--a)" : "var(--bd)"
-      }} onClick={() => loadRanking(rankingTab, period)}>{period === "weekly" ? "Weekly" : period === "monthly" ? "Monthly" : "All"}</button>)}
-    </div>
-    {rankingLoading && <div className="empty">Loading...</div>}
-    {!rankingLoading && rankingData.length === 0 && <div className="empty">{rankingTab === "learning" ? "No learning data yet" : "No ranking data yet"}</div>}
-    {!rankingLoading && rankingData.map((row, i) => <div key={row.user_id || row.id || i} className="rank-row">
-      <div key={row?.id ?? i} className={`rank-no ${i === 0 ? "rank-no-1" : i === 1 ? "rank-no-2" : i === 2 ? "rank-no-3" : "rank-no-n"}`}>{i + 1}</div>
-      <div key={row?.id ?? i} className="rank-nick">{row.nickname || row.user_id?.slice?.(0, 8) || "Learner"}</div>
-      <div key={row?.id ?? i} className="rank-score">{rankingTab === "learning" ? row.rank_score ?? row.score ?? 0 : row.score ?? 0}pt</div>
-    </div>)}
-  </div>;
-  const NicknameModal = () => showNickEdit ? <div className="nick-modal-overlay" onClick={() => setShowNickEdit(false)}>
-    <div className="nick-modal" onClick={e => e.stopPropagation()}>
-      <div className="jp" style={{
-        fontSize: 18,
-        fontWeight: 800,
-        marginBottom: 12
-      }}>Nickname</div>
-      <input className="url-inp" value={nickInput} onChange={e => setNickInput(e.target.value)} placeholder="Display name" />
-      <div style={{
-        display: "flex",
-        gap: 8,
-        marginTop: 14
-      }}>
-        <button className="bg" style={{
-          flex: 1
-        }} onClick={() => setShowNickEdit(false)}>Cancel</button>
-        <button className="bp" style={{
-          flex: 1
-        }} onClick={() => saveProfile(nickInput)}>Save</button>
+  const RankingScreen = () => {
+    const periods = [{ id: 'daily', label: '今日' }, { id: 'weekly', label: '7日間' }, { id: 'all', label: '累計' }];
+    const tabs = [{ id: 'points', label: 'ポイント獲得' }, { id: 'coins', label: 'コイン消費' }];
+    return <div className="sa" style={{ padding: 16 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        {tabs.map(tab => <button key={tab.id} className="bg" style={{ flex: 1, background: rankingTab === tab.id ? "var(--p)" : "var(--sur)", color: rankingTab === tab.id ? "#fff" : "var(--t2)" }} onClick={() => loadRanking(tab.id, rankingPeriod)}>{tab.label}</button>)}
       </div>
-    </div>
-  </div> : null;
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        {periods.map(period => <button key={period.id} className="bg" style={{ flex: 1, borderColor: rankingPeriod === period.id ? "var(--a)" : "var(--bd)" }} onClick={() => loadRanking(rankingTab, period.id)}>{period.label}</button>)}
+      </div>
+      {rankingLoading && <div className="empty">ランキングを読み込み中...</div>}
+      {!rankingLoading && rankingData.length === 0 && <div className="empty">まだランキングデータがありません</div>}
+      {!rankingLoading && rankingData.length === 1 && rankingData[0]?.isSelfFallback && <div className="jp" style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 8 }}>まだ参加者が少ないため、自分の行だけ表示しています。</div>}
+      {!rankingLoading && rankingData.map((row, i) => {
+        const value = rankingTab === 'coins' ? Number(row.coins_spent ?? row.score ?? 0) : Number(row.points ?? row.rank_score ?? row.score ?? 0);
+        return <div key={row.user_id || row.id || i} className="rank-row">
+          <div className={`rank-no ${i === 0 ? "rank-no-1" : i === 1 ? "rank-no-2" : i === 2 ? "rank-no-3" : "rank-no-n"}`}>{row.rank || i + 1}</div>
+          <div style={{ width: 30, height: 30, borderRadius: 10, background: 'var(--pl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--p)', flexShrink: 0 }}>{row.avatar || row.avatar_emoji || 'EB'}</div>
+          <div className="rank-nick">{row.nickname || row.user_id?.slice?.(0, 8) || "Learner"}{row.user_id === userId ? '（自分）' : ''}</div>
+          <div className="rank-score">{value}{rankingTab === 'coins' ? ' coins' : ' pt'}</div>
+        </div>;
+      })}
+      <div className="jp" style={{ fontSize: 11, color: 'var(--t3)', marginTop: 10 }}>期間: {periods.find(p => p.id === rankingPeriod)?.label || '累計'}</div>
+    </div>;
+  };
+  const NicknameModal = () => {
+    const [draftName, setDraftName] = React.useState(nickInput || myProfile?.nickname || '');
+    const [draftAvatar, setDraftAvatar] = React.useState(myProfile?.avatar_emoji || 'EB');
+    React.useEffect(() => {
+      if (showNickEdit) {
+        setDraftName(nickInput || myProfile?.nickname || '');
+        setDraftAvatar(myProfile?.avatar_emoji || 'EB');
+      }
+    }, [showNickEdit, nickInput, myProfile?.nickname, myProfile?.avatar_emoji]);
+    if (!showNickEdit) return null;
+    return <div className="nick-modal-overlay" onClick={() => setShowNickEdit(false)}>
+      <div className="nick-modal" onClick={e => e.stopPropagation()}>
+        <div className="jp" style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>プロフィール編集</div>
+        <input className="url-inp" value={draftName} onChange={e => setDraftName(e.target.value)} placeholder="ニックネーム" />
+        <div className="jp" style={{ fontSize: 12, color: 'var(--t3)', margin: '12px 0 6px' }}>アイコン</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
+          {['EB', 'A+', 'TOEIC', 'AI', '★'].map(icon => <button key={icon} className="bg" style={{ padding: 8, borderColor: draftAvatar === icon ? 'var(--a)' : 'var(--bd)', color: draftAvatar === icon ? 'var(--a)' : 'var(--t2)' }} onClick={() => setDraftAvatar(icon)}>{icon}</button>)}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          <button className="bg" style={{ flex: 1 }} onClick={() => setShowNickEdit(false)}>キャンセル</button>
+          <button className="bp" style={{ flex: 1 }} onClick={() => { saveProfile(draftName, draftAvatar); setShowNickEdit(false); }}>保存</button>
+        </div>
+      </div>
+    </div>;
+  };
   const Settings = () => {
     const totalSessions = [...TR.word, ...TR.grammar, ...TR.listening, ...TR.shadowing].length;
     const todayCount = streakStats?.todayCount || 0;
+    const todayWords = streakStats?.todayWords || 0;
     const streak = streakStats?.streak || 0;
+    const lastWord = TR.word.slice(-1)[0];
+    const lastGrammar = TR.grammar.slice(-1)[0];
+    const lastListening = TR.listening.slice(-1)[0];
+    const pct = r => r && r.total ? `${Math.round(r.correct / r.total * 100)}%` : '-';
     return <div className="sa">
       <div className="stlist">
         <div className="sc" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--pl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>EB</div>
+          <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--pl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800, color: 'var(--p)' }}>{myProfile?.avatar_emoji || 'EB'}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="jp" style={{ fontWeight: 800, fontSize: 16 }}>{myProfile?.nickname || authUser?.email || 'ゲスト学習者'}</div>
             <div style={{ fontSize: 12, color: 'var(--t3)' }}>{authUser ? 'Googleログイン中' : '未ログイン: 端末内に保存'}</div>
@@ -632,17 +657,20 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>今日の学習</div><div style={{ fontSize: 26, fontWeight: 800, color: 'var(--p)' }}>{todayCount}</div></div>
           <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>連続日数</div><div style={{ fontSize: 26, fontWeight: 800, color: 'var(--a)' }}>{streak}日</div></div>
-          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>テスト回数</div><div style={{ fontSize: 26, fontWeight: 800 }}>{totalSessions}</div></div>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>今日の単語</div><div style={{ fontSize: 26, fontWeight: 800 }}>{todayWords}</div></div>
           <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>保存アイテム</div><div style={{ fontSize: 26, fontWeight: 800 }}>{saved.length}</div></div>
         </div>
+        <div className="stst">学習統計</div>
+        <div className="sti"><span>学習ポイント</span><strong>{pts} pt</strong></div>
+        <div className="sti"><span>テスト回数</span><strong>{totalSessions}</strong></div>
+        <div className="sti"><span>直近単語</span><strong>{pct(lastWord)}</strong></div>
+        <div className="sti"><span>直近Part5</span><strong>{pct(lastGrammar)}</strong></div>
+        <div className="sti"><span>直近リスニング</span><strong>{pct(lastListening)}</strong></div>
         <div className="stst">ウォレット</div>
         <div className="sti"><span>コイン</span><strong>{wallet.coins}</strong></div>
         <div className="sti"><span>ガチャチケット</span><strong>{wallet.gacha_tickets}</strong></div>
-        <div className="stst">表示・連携</div>
-        <div className="sti"><span>動画保存</span><strong>{SB_READY ? 'クラウド対応' : 'ローカルのみ'}</strong></div>
-        <div className="sti"><span>広告・特典</span><strong>{REWARD_ADS_ENABLED ? '有効' : '準備中'}</strong></div>
-        <div className="sti"><span>アフィリエイト表示</span><button className={"tog ".concat(sett.affOn ? 'on' : 'off')} onClick={() => setSett(s => ({ ...s, affOn: !s.affOn }))} /></div>
-        <div className="sti"><span>復習広告</span><button className={"tog ".concat(sett.rewOn ? 'on' : 'off')} onClick={() => setSett(s => ({ ...s, rewOn: !s.rewOn }))} /></div>
+        <div className="stst">データ連携</div>
+        <div className="sti"><span>保存状態</span><strong>{SB_READY ? 'クラウド同期' : 'ローカル保存'}</strong></div>
         <button className="bg" onClick={() => setShowRanking(true)}>ランキングを見る</button>
         {authUser ? <button className="bg" onClick={async () => { await supabaseAuth.signOut(); if (typeof window !== 'undefined') window.location.reload(); }}>ログアウト</button> : <button className="bp" onClick={loginWithGoogle}>Googleでログイン</button>}
       </div>

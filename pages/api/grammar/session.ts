@@ -17,6 +17,16 @@ function uniqueById(rows: any[]) {
   });
 }
 
+function uniqueBySentence(rows: any[]) {
+  const seen = new Set<string>();
+  return rows.filter(row => {
+    const key = String(row?.sentence || row?.s || '').trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { userId = '', count = 5, mode = 'test', questionId = '' } = req.body ?? {};
@@ -64,56 +74,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   });
 
-  const masteredRows = rows.filter((r: any) => (correctCounts.get(r.id) ?? 0) >= 2);
-  const activeRows = rows.filter((r: any) => (correctCounts.get(r.id) ?? 0) < 2);
-  const baseRows = activeRows.length >= safeCount ? activeRows : rows;
-  const correctRows = baseRows.filter((r: any) => latest.get(r.id)?.is_correct === true);
+  const existingTarget = mode === 'test' ? Math.min(6, safeCount) : safeCount;
+  const generatedTarget = mode === 'test' ? Math.max(0, safeCount - existingTarget) : 0;
+  const baseRows = rows;
   const wrongRows = baseRows.filter((r: any) => latest.get(r.id)?.is_correct === false);
   const untouchedRows = baseRows.filter((r: any) => !latest.has(r.id));
-  const generatedTarget = safeCount >= 10 ? 3 : Math.max(1, Math.floor(safeCount / 3));
-  const allowedGeneratedTarget = generatedTarget;
   const aiCost = 0;
   const remaining: number | undefined = undefined;
-  const dbTarget = Math.max(0, safeCount - allowedGeneratedTarget);
-  const correctTarget = Math.floor(dbTarget * 0.4);
-  const wrongTarget = Math.floor(dbTarget * 0.4);
 
-  const selected: any[] = [
-    ...weightedShuffleByQuality(correctRows).slice(0, correctTarget),
-    ...weightedShuffleByQuality(wrongRows).slice(0, wrongTarget),
-  ];
+  const dbRows = uniqueById([
+    ...weightedShuffleByQuality(untouchedRows),
+    ...weightedShuffleByQuality(wrongRows),
+    ...weightedShuffleByQuality(baseRows),
+  ]).slice(0, existingTarget);
 
   const generatedRows: any[] = [];
-  const generatedSeen = new Set(rows.map((r: any) => String(r.id || r.sentence || '')));
-  for (let i = 0; generatedRows.length < allowedGeneratedTarget && i < allowedGeneratedTarget * 4; i += 1) {
+  const generatedSeen = new Set(rows.map((r: any) => String(r.sentence || '').trim().toLowerCase()));
+  for (let i = 0; generatedRows.length < generatedTarget && i < Math.max(4, generatedTarget * 5); i += 1) {
     const generated = await generateGrammarQuestion(String(userId));
-    const key = String(generated?.id || generated?.sentence || '');
+    const key = String(generated?.sentence || generated?.s || '').trim().toLowerCase();
     if (generated && key && !generatedSeen.has(key)) {
       generatedSeen.add(key);
       generatedRows.push(generated);
     }
   }
 
-  const dbSeed = uniqueById([
-    ...selected,
-    ...weightedShuffleByQuality(untouchedRows),
-    ...weightedShuffleByQuality(baseRows),
-  ]).filter((r: any) => !generatedRows.some(g => g.id === r.id)).slice(0, dbTarget);
-  const dbFill = weightedShuffleByQuality(rows)
-    .filter((r: any) => !dbSeed.some(s => s.id === r.id) && !generatedRows.some(g => g.id === r.id))
-    .slice(0, Math.max(0, dbTarget - dbSeed.length));
-  const finalRows = uniqueById([...dbSeed, ...dbFill, ...generatedRows]).slice(0, safeCount);
+  if (generatedRows.length < generatedTarget) {
+    return res.status(200).json({
+      ok: false,
+      error: 'AI新規問題を必要数生成できませんでした。コインは消費されません。',
+      questions: [],
+      fallbackQuestions: dbRows.map(rowToQuestion),
+      plan: {
+        existingTarget,
+        generatedTarget: generatedRows.length,
+        requestedGeneratedTarget: generatedTarget,
+        aiCost,
+        remaining,
+      },
+    });
+  }
+
+  const finalRows = uniqueBySentence([...dbRows, ...generatedRows]).slice(0, safeCount);
 
   return res.status(200).json({
+    ok: true,
     questions: weightedShuffleByQuality(finalRows).map(rowToQuestion),
     plan: {
-      correctTarget,
-      wrongTarget,
+      existingTarget: dbRows.length,
       generatedTarget: generatedRows.length,
       requestedGeneratedTarget: generatedTarget,
       aiCost,
       remaining,
-      masteredExcluded: activeRows.length >= safeCount ? masteredRows.length : 0,
     },
   });
 }

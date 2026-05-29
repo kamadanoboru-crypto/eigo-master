@@ -340,7 +340,7 @@ function EigoMasterInner() {
   const [adGachaLeft, setAdGachaLeft] = useState<any>(6);
   // ── SNS state ────────────────────────────────────────────────
   const [myProfile, setMyProfile] = useState<any>(null);
-  const [rankingTab, setRankingTab] = useState<any>('learning');
+  const [rankingTab, setRankingTab] = useState<any>('points');
   const [rankingPeriod, setRankingPeriod] = useState<any>('weekly');
   const [rankingData, setRankingData] = useState<any>([]);
   const [rankingLoading, setRankingLoading] = useState<any>(false);
@@ -1133,7 +1133,7 @@ function EigoMasterInner() {
     setGrammarList(rows);
     setGrammarListLoading(false);
   };
-  const quizCountForMode = mode => mode === 'practice' ? 5 : 10;
+  const quizCountForMode = (mode, type = '') => type === 'grammarTest' && mode !== 'practice' ? 8 : mode === 'practice' ? 5 : 10;
   const costForMode = mode => mode === 'practice' ? COIN_COSTS.PRACTICE : COIN_COSTS.TEST;
   const canStartPaidMode = cost => {
     if (!SB_READY) return true;
@@ -1180,7 +1180,7 @@ function EigoMasterInner() {
     }));
   };
   const buildStandardQuizQuestions = async (type, mode) => {
-    const count = quizCountForMode(mode);
+    const count = quizCountForMode(mode, type);
     if (mode === 'practice') return existingQuizQuestions(type, count);
     const quizType = type === "wordTest" ? 'word' : type === "grammarTest" ? 'grammar' : 'listening';
     const existing = existingQuizQuestions(type, 5);
@@ -1229,13 +1229,17 @@ function EigoMasterInner() {
   const startGrammarDbTest = async () => {
     var _qs__meta_plan, _qs__meta, _qs__meta_plan1, _qs__meta1;
     if (!canStartPaidMode(COIN_COSTS.TEST)) return;
-    const qs = await fetchGrammarSession(userId, 'test', 10);
+    const qs = await fetchGrammarSession(userId, 'test', 8);
     if (typeof ((_qs__meta = qs._meta) === null || _qs__meta === void 0 ? void 0 : (_qs__meta_plan = _qs__meta.plan) === null || _qs__meta_plan === void 0 ? void 0 : _qs__meta_plan.remaining) === 'number') setWallet(w => ({
       ...w,
       coins: qs._meta.plan.remaining
     }));
     if ((_qs__meta1 = qs._meta) === null || _qs__meta1 === void 0 ? void 0 : (_qs__meta_plan1 = _qs__meta1.plan) === null || _qs__meta_plan1 === void 0 ? void 0 : _qs__meta_plan1.aiCost) t$("Part5 AI -".concat(qs._meta.plan.aiCost, " coins"), 'info');
-    const nextQuestions = qs.length ? qs : await genGrammar(saved, 10, userId);
+    if (!qs.length) {
+      t$('AI新規問題を生成できませんでした。コインは消費されません。', 'warn');
+      return;
+    }
+    const nextQuestions = qs;
     if (!nextQuestions.length) return;
     setGrammarMode('test');
     resetQuizState('grammarTest');
@@ -1252,11 +1256,14 @@ function EigoMasterInner() {
     const isFree = !SB_READY || type === "grammarTest";
     const cost = costForMode(mode);
     if (!isFree && !canStartPaidMode(cost)) return;
-    const qCount = quizCountForMode(mode);
+    const qCount = quizCountForMode(mode, type);
     try {
       var _qs__meta_plan, _qs__meta;
       const qs = type === "grammarTest" ? await fetchGrammarSession(userId, mode, qCount) : await buildStandardQuizQuestions(type, mode);
-      if (!qs.length) return;
+      if (!qs.length) {
+        if (type === "grammarTest" && mode !== 'practice') t$('AI新規問題を生成できませんでした。コインは消費されません。', 'warn');
+        return;
+      }
       if (type === "grammarTest" && typeof ((_qs__meta = qs._meta) === null || _qs__meta === void 0 ? void 0 : (_qs__meta_plan = _qs__meta.plan) === null || _qs__meta_plan === void 0 ? void 0 : _qs__meta_plan.remaining) === 'number') {
         setWallet(w => ({
           ...w,

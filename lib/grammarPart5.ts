@@ -180,11 +180,7 @@ Return JSON only:
   } catch (e) {
     console.error('[grammar] generate failed', e);
   }
-  const fallback = toQuestionRow(FALLBACK_GRAMMAR[Math.floor(Math.random() * FALLBACK_GRAMMAR.length)], userId);
-  const inserted = fallback
-    ? await sbPost('grammar_questions?on_conflict=sentence', fallback, 'return=representation,resolution=ignore-duplicates')
-    : null;
-  return Array.isArray(inserted) && inserted[0] ? inserted[0] : null;
+  return null;
 }
 
 export function shuffle<T>(items: T[]): T[] {
