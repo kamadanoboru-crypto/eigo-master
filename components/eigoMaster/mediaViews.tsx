@@ -384,6 +384,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     ytReaderReady,
     ytReaderRef
   } = deps;
+  const wsResultRecordedRef = React.useRef(false);
   const VideoScreen = () => /*#__PURE__*/<div className="sa">{proc.active && proc.videoId === (curVid === null || curVid === void 0 ? void 0 : curVid.videoId) && /*#__PURE__*/<div style={{
       background: 'linear-gradient(135deg,#0B1F38,#183153)',
       padding: '10px 16px',
@@ -1148,7 +1149,11 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     if (wsPhase === 'result' || wsPhaseScreen === 'result') {
       const star = wsLives >= wsMaxLives ? '🌟' : wsLives >= 3 ? '⭐' : wsLives >= 1 ? '✨' : '💀';
       const cleared = wsWordQueue.length === 0;
-      if (cleared && wsScore > 0) {
+      if (cleared && wsScore > 0 && !wsResultRecordedRef.current) {
+        wsResultRecordedRef.current = true;
+        const total = Math.max(1, wsQuizWords.length);
+        const correct = Math.min(total, Math.max(0, Math.round(wsScore / 10)));
+        dbSaveTestResult('shooter', correct, total, wsScore);
         // ステージクリア報酬
         setTimeout(() => {
           setPts(p => p + 20);
@@ -1294,7 +1299,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
             background: 'rgba(16,185,129,.8)'
           }}>{word.en} OK</div>}</div> : /*#__PURE__*/<div key={word.id} className="ws-word" style={{
           left: "".concat(word.x, "%"),
-          animationDuration: wsSlowed ? '18s' : '9s',
+          animationDuration: "".concat(Math.max(4.5, (wsSlowed ? 18 : 9) - (wsStage - 1) * 1.2 - Math.max(0, wsQuizWords.length - wsWordQueue.length - activeWords().length) * 0.15), "s"),
           animationDelay: (() => {
             const elapsedMs = Math.max(0, Date.now() - Number(word.startedAt || Date.now()) - Number(word.delayMs || 0));
             return elapsedMs > 0 ? "-".concat(elapsedMs / 1000, "s") : "".concat(Number(word.delayMs || idx * 350) / 1000, "s");
@@ -1967,6 +1972,11 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     const cost = mode === 'practice' ? COIN_COSTS.PRACTICE : COIN_COSTS.TEST;
     const requestedCount = mode === 'practice' ? 5 : 10;
     const localPool = buildWordPool();
+    const rankedPool = localPool.map(word => {
+      const vote = Number(studyVotes[`shooter:${word.en}`] || 0);
+      const weight = vote > 0 ? 1.35 : vote < 0 ? 0.7 : 1;
+      return { word, key: Math.random() ** (1 / weight) };
+    }).sort((a, b) => b.key - a.key).map(item => item.word);
     if (!localPool.length) {
       t$('Word pool is empty.', 'warn');
       return;
@@ -2008,8 +2018,8 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
         console.warn('[word-shooter] AI generation failed; falling back to existing words', e);
       }
     }
-    const baseWords = mode === 'practice' ? shuffle(localPool).slice(0, requestedCount) : shuffle(localPool).slice(0, 5);
-    const queue = shuffle(mode === 'test' && generatedWords.length ? [...baseWords, ...generatedWords].slice(0, requestedCount) : shuffle(localPool).slice(0, requestedCount));
+    const baseWords = mode === 'practice' ? rankedPool.slice(0, requestedCount) : rankedPool.slice(0, 5);
+    const queue = shuffle(mode === 'test' && generatedWords.length ? [...baseWords, ...generatedWords].slice(0, requestedCount) : rankedPool.slice(0, requestedCount));
     if (!queue.length) {
       t$('Could not start word shooter.', 'warn');
       return;
@@ -2023,6 +2033,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     setWsWrong(null);
     setWsFlash(false);
     setWsCombo(0);
+    wsResultRecordedRef.current = false;
     const skillCount = {
       slow: wsEquipped.filter(e => e === 'slow').length,
       hint: wsEquipped.filter(e => e === 'hint').length,
@@ -2048,6 +2059,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
         setWsActive(false);
         setWsPhase('idle');
         setWsPhaseScreen('menu');
+        t$('開始に失敗したためコインは消費されませんでした', 'warn');
         return;
       }
       t$("".concat(mode === 'practice' ? 'Practice' : 'Test', " -").concat(cost, " coins"), 'info');

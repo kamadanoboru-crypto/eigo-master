@@ -1199,10 +1199,17 @@ function EigoMasterInner() {
     setLisN(0);
     setPlay(false);
   };
+  const weightedStudyShuffle = (items, keyFn) => {
+    return items.map((item, index) => {
+      const vote = Number(studyVotes[keyFn(item, index)] || 0);
+      const weight = vote > 0 ? 1.35 : vote < 0 ? 0.7 : 1;
+      return { item, key: Math.random() ** (1 / weight) };
+    }).sort((a, b) => b.key - a.key).map(entry => entry.item);
+  };
   const existingQuizQuestions = (type, count) => {
-    if (type === "wordTest") return shuffle(WORDS).slice(0, count).map((w, __idx) => {
+    if (type === "wordTest") return weightedStudyShuffle(WORDS, w => `word:${w.id}`).slice(0, count).map((w, __idx) => {
       const correct = w.meaning || '';
-      const wrong = shuffle(WORDS.filter(x => x.id !== w.id && x.meaning !== correct)).slice(0, 3).map(x => x.meaning || '');
+      const wrong = shuffle(WORDS.filter(x => x.id !== w.id && x.meaning !== correct)).slice(0, 7).map(x => x.meaning || '');
       return {
         ...w,
         options: shuffle([correct, ...wrong]),
@@ -1214,9 +1221,9 @@ function EigoMasterInner() {
       options: q.options || q.opts || [],
       correct: q.correct || q.ans
     }));
-    return shuffle(LISTENING).slice(0, count).map((i, __idx) => ({
+    return weightedStudyShuffle(LISTENING, (i, idx) => `listening:${i.id || idx}`).slice(0, count).map((i, __idx) => ({
       ...i,
-      options: shuffle([i.jp, ...(i.d || [])]),
+      options: shuffle([i.jp, ...(i.d || []), ...LISTENING.filter(x => x.jp !== i.jp).slice(0, 7).map(x => x.jp)]).slice(0, 8),
       correct: i.jp
     }));
   };

@@ -70,19 +70,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const safePeriod = period === 'daily' || period === 'weekly' || period === 'all' ? period : 'all';
   const since = periodSince(safePeriod);
   const filter = since ? `&created_at=gte.${encodeURIComponent(since)}` : '';
+  const unlockFilter = since ? `&unlocked_at=gte.${encodeURIComponent(since)}` : '';
   const ownId = String(userId || '');
   const max = Math.min(Math.max(Number(limit) || 50, 1), 100);
 
   try {
     if (safeType === 'coins') {
-      const unlockRows = await sb(`content_unlocks?select=user_id,coins_spent,created_at${filter}&limit=5000`);
+      const unlockRows = await sb(`unlocked_content?select=user_id,coins_spent,unlocked_at${unlockFilter}&limit=5000`);
       const adviceRows = await sb(`advice_history?select=user_id,coins_used,created_at${filter}&limit=5000`);
+      const learningRows = await sb(`learning_logs?select=user_id,type,total,created_at${filter}&limit=5000`);
       const map: Record<string, number> = {};
       unlockRows.forEach((row: any) => {
         map[row.user_id] = (map[row.user_id] ?? 0) + Number(row.coins_spent || 0);
       });
       adviceRows.forEach((row: any) => {
         map[row.user_id] = (map[row.user_id] ?? 0) + Number(row.coins_used || 0);
+      });
+      learningRows.forEach((row: any) => {
+        const type = String(row.type || '');
+        const isPractice = Number(row.total || 0) <= 5;
+        const estimated = type === 'word' || type === 'grammar' || type === 'listening' || type === 'shooter'
+          ? isPractice ? 5 : 10
+          : 0;
+        map[row.user_id] = (map[row.user_id] ?? 0) + estimated;
       });
       let ranking = Object.entries(map).map(([uid, value]) => ({ user_id: uid, coins_spent: value, score: value }));
       ranking = await attachProfiles(ranking, ownId);

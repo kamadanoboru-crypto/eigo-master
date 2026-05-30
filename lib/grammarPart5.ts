@@ -190,6 +190,78 @@ export async function seedFallbackQuestions(userId = '') {
   return rows.length ? rows : fallbackRows();
 }
 
+const LOCAL_AI_FALLBACK = [
+  {
+    s: 'The training session will begin _____ the new employees arrive.',
+    ja: '新入社員が到着したら、研修セッションが始まります。',
+    options: ['when', 'despite', 'during', 'unless'],
+    correct: 'when',
+    exp: '時を表す接続詞として「到着したら」は when が自然です。',
+    cat: 'conjunction',
+    source: 'ai_fallback',
+  },
+  {
+    s: 'The invoice was sent _____ the accounting department yesterday.',
+    ja: 'その請求書は昨日、経理部に送られました。',
+    options: ['to', 'for', 'with', 'by'],
+    correct: 'to',
+    exp: 'send A to B で「AをBへ送る」という意味になります。',
+    cat: 'preposition',
+    source: 'ai_fallback',
+  },
+  {
+    s: 'Our team needs _____ the final report before noon.',
+    ja: '私たちのチームは正午までに最終報告書を確認する必要があります。',
+    options: ['to review', 'reviewed', 'reviewing', 'review'],
+    correct: 'to review',
+    exp: 'need の後に目的を表す動詞を置く場合は to 不定詞を使います。',
+    cat: 'infinitive',
+    source: 'ai_fallback',
+  },
+  {
+    s: 'The documents should be kept in a _____ location.',
+    ja: 'その書類は安全な場所に保管されるべきです。',
+    options: ['secure', 'secures', 'securely', 'security'],
+    correct: 'secure',
+    exp: 'location を修飾する形容詞が必要なので secure が正解です。',
+    cat: 'vocabulary',
+    source: 'ai_fallback',
+  },
+  {
+    s: 'The software update was completed _____ than expected.',
+    ja: 'ソフトウェア更新は予想より早く完了しました。',
+    options: ['earlier', 'early', 'earliest', 'earliness'],
+    correct: 'earlier',
+    exp: 'than expected と比較しているため、比較級 earlier を使います。',
+    cat: 'comparison',
+    source: 'ai_fallback',
+  },
+  {
+    s: 'Customers who register online will receive a confirmation email _____.',
+    ja: 'オンラインで登録した顧客は、確認メールをすぐに受け取ります。',
+    options: ['immediately', 'immediate', 'immediacy', 'more immediate'],
+    correct: 'immediately',
+    exp: 'receive を修飾する副詞が必要なので immediately が正解です。',
+    cat: 'adverb',
+    source: 'ai_fallback',
+  },
+];
+
+async function saveGeneratedQuestion(q: any, userId = '') {
+  const row = toQuestionRow(q, userId);
+  if (!row) return null;
+  const inserted = await sbPost('grammar_questions?on_conflict=sentence', row, 'return=representation,resolution=ignore-duplicates');
+  if (Array.isArray(inserted) && inserted[0]) return inserted[0];
+  const existing = await sbGet(`grammar_questions?select=*&sentence=eq.${encodeURIComponent(row.sentence)}&limit=1`);
+  if (Array.isArray(existing) && existing[0]) return existing[0];
+  return toTransientQuestionRow(q, userId);
+}
+
+async function generateLocalGrammarFallback(userId = '') {
+  const q = shuffle(LOCAL_AI_FALLBACK)[0];
+  return q ? saveGeneratedQuestion(q, userId) : null;
+}
+
 export async function generateGrammarQuestion(userId = '') {
   const prompt = `Create exactly ONE valid TOEIC Part 5 multiple-choice question for Japanese learners.
 
@@ -223,18 +295,12 @@ Return this exact JSON shape with original real content. Keep valid JSON:
   try {
     const raw = await callAI(prompt, 700, 'You generate strict JSON for TOEIC Part 5. Output exactly one JSON object and obey every validation rule.');
     const parsed = parseJSON<any>(raw, null);
-    const row = toQuestionRow(parsed, userId);
-    if (row) {
-      const inserted = await sbPost('grammar_questions?on_conflict=sentence', row, 'return=representation,resolution=ignore-duplicates');
-      if (Array.isArray(inserted) && inserted[0]) return inserted[0];
-      const existing = await sbGet(`grammar_questions?select=*&sentence=eq.${encodeURIComponent(row.sentence)}&limit=1`);
-      if (Array.isArray(existing) && existing[0]) return existing[0];
-      return toTransientQuestionRow(parsed, userId);
-    }
+    const saved = await saveGeneratedQuestion(parsed, userId);
+    if (saved) return saved;
   } catch (e) {
     console.error('[grammar] generate failed', e);
   }
-  return null;
+  return generateLocalGrammarFallback(userId);
 }
 
 export function shuffle<T>(items: T[]): T[] {

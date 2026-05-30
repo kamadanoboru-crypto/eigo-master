@@ -34,7 +34,7 @@ function uniqueBySentence(rows: any[]) {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { userId = '', count = 5, mode = 'test', questionId = '' } = req.body ?? {};
-  const safeCount = Math.min(Math.max(Number(count) || 5, 1), 20);
+  const safeCount = mode === 'test' ? 8 : Math.min(Math.max(Number(count) || 5, 1), 20);
   let rows = await getRows(String(userId));
   const dbIds = rows.map((r: any) => r.id).filter((id: string) => id && !String(id).startsWith('fallback-'));
   const votes = dbIds.length
@@ -60,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   });
 
-  const generatedTarget = safeCount > 0 ? 1 : 0;
+  const generatedTarget = mode === 'test' ? 2 : 0;
   const existingTarget = Math.max(0, safeCount - generatedTarget);
   const baseRows = rows;
   const wrongRows = baseRows.filter((r: any) => latest.get(r.id)?.is_correct === false);

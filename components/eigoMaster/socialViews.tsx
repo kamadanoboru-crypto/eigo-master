@@ -433,6 +433,7 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
     const [filterCategory, setFilterCategory] = React.useState('all');
     const [replyBody, setReplyBody] = React.useState('');
     const [loading, setLoading] = React.useState(false);
+    const [editing, setEditing] = React.useState(null);
     const splitPost = post => {
       const text = String(post?.body || '');
       const m = text.match(/^# (.+)\n([\s\S]*)$/);
@@ -527,6 +528,29 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         loadReplies(selectedThread);
       }
     };
+    const saveEdit = async post => {
+      const nextTitle = String(editing?.title || '').trim() || '学習メモ';
+      const nextBody = String(editing?.body || '').trim();
+      const nextCategory = editing?.category || normalizeCategory(post.category);
+      if (!post?.id || !nextBody) return;
+      const patched = p => p.id === post.id ? { ...p, body: `# ${nextTitle}\n${nextBody}`, category: nextCategory } : p;
+      setPosts(prev => prev.map(patched));
+      setReplies(prev => prev.map(patched));
+      setSelectedThread(prev => prev?.id === post.id ? patched(prev) : prev);
+      setEditing(null);
+      try {
+        const r = await fetch('/api/social/talk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'edit', postId: post.id, userId, title: nextTitle, body: nextBody, category: nextCategory }) });
+        const d = await r.json().catch(() => ({}));
+        if (!d.ok) {
+          t$(d.reason || '保存できませんでした', 'warn');
+        }
+        await loadPosts();
+        if (selectedThread?.id === post.id) setSelectedThread(prev => prev ? patched(prev) : prev);
+      } catch (e) {
+        t$('保存できませんでした', 'warn');
+        loadPosts();
+      }
+    };
     const VoteButtons = ({ post }) => <div style={{ display: 'flex', gap: 8, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
       <button className="bg" title="いいね" style={{ minWidth: 58, borderColor: post.my_vote === 1 ? 'var(--a)' : 'var(--bd)', background: post.my_vote === 1 ? '#FEF3C7' : 'var(--sur)' }} onClick={() => votePost(post, 1)}>👍 {post.like_count || 0}</button>
       <button className="bg" title="わるいね" style={{ minWidth: 58, borderColor: post.my_vote === -1 ? '#FCA5A5' : 'var(--bd)', background: post.my_vote === -1 ? '#FEE2E2' : 'var(--sur)', color: post.my_vote === -1 ? '#DC2626' : 'var(--t)' }} onClick={() => votePost(post, -1)}>👎 {post.dislike_count || 0}</button>
@@ -534,15 +558,24 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
     const PostCard = ({ post, i = 0, compact = false }) => {
       const cat = categories.find(c => c.id === normalizeCategory(post.category)) || categories[0];
       const parsed = splitPost(post);
+      const isEditing = editing?.id === post.id;
+      const isMine = post.user_id === userId;
       return <div key={post.id || i} className="sc" style={{ marginBottom: 10, cursor: compact ? 'default' : 'pointer' }} onClick={() => !compact && (setSelectedThread(post), setReplies([]))}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 8 }}>
           <div style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--pl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{post.avatar_emoji || '🎓'}</div>
           <div style={{ minWidth: 0, flex: 1 }}><div className="jp" style={{ fontWeight: 800 }}>{post.nickname || post.user_id?.slice?.(0, 8) || 'Guest'}</div><div style={{ fontSize: 11, color: 'var(--t3)' }}>{post.created_at ? new Date(post.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</div></div>
           <span className="strategy-chip" style={{ background: cat.color + '18', color: cat.color }}>{cat.label}</span>
         </div>
-        <div className="jp" style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>{parsed.title}</div>
-        <div className="jp" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, marginBottom: 10 }}>{parsed.body}</div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><VoteButtons post={post} />{!compact && <span className="bg" style={{ fontSize: 12, padding: '7px 10px', borderColor: 'var(--bd)' }}>💬 {post.reply_count || 0}</span>}</div>
+        {isEditing ? <div style={{ display: 'grid', gap: 8 }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>{categories.map(item => <button key={item.id} className="bg" style={{ padding: '7px 10px', whiteSpace: 'nowrap', borderColor: editing.category === item.id ? item.color : 'var(--bd)', color: editing.category === item.id ? item.color : 'var(--t2)' }} onClick={() => setEditing(prev => ({ ...prev, category: item.id }))}>{item.label}</button>)}</div>
+          <input className="url-inp" value={editing.title} onChange={e => setEditing(prev => ({ ...prev, title: e.target.value }))} />
+          <textarea className="url-inp" value={editing.body} onChange={e => setEditing(prev => ({ ...prev, body: e.target.value }))} rows={3} style={{ resize: 'vertical' }} />
+          <div style={{ display: 'flex', gap: 8 }}><button className="bp" onClick={() => saveEdit(post)}>保存</button><button className="bg" onClick={() => setEditing(null)}>キャンセル</button></div>
+        </div> : <>
+          <div className="jp" style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>{parsed.title}</div>
+          <div className="jp" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, marginBottom: 10 }}>{parsed.body}</div>
+        </>}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><VoteButtons post={post} />{!compact && <span className="bg" style={{ fontSize: 12, padding: '7px 10px', borderColor: 'var(--bd)' }}>💬 {post.reply_count || 0}</span>}{isMine && !isEditing && <button className="bg" style={{ marginLeft: 'auto' }} onClick={e => { e.stopPropagation(); setEditing({ id: post.id, title: parsed.title, body: parsed.body, category: normalizeCategory(post.category) }); }}>編集</button>}</div>
       </div>;
     };
     if (selectedThread) {
