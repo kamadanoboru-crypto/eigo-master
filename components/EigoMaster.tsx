@@ -2360,9 +2360,11 @@ function EigoMasterInner() {
         }));
       } else {
         console.warn('[video vote]', d.error || r.status);
+        t$(d.error || 'いいねの保存に失敗しました', 'warn');
       }
     } catch (err) {
       console.warn('[video vote]', err);
+      t$('いいねの保存に失敗しました', 'warn');
     }
   };
   // SCREENS

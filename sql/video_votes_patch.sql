@@ -18,3 +18,18 @@ create index if not exists idx_user_videos_quality
 
 create index if not exists idx_video_votes_video
   on video_votes(video_id, vote_type);
+
+alter table video_votes enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'video_votes'
+      and policyname = 'video_votes_rw'
+  ) then
+    create policy "video_votes_rw" on video_votes
+      for all using (true) with check (true);
+  end if;
+end $$;

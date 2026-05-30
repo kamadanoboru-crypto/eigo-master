@@ -1,11 +1,15 @@
 // @ts-nocheck
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { applyQuestionQuality, generateGrammarQuestion, isUsableGrammarRow, rowToQuestion, sbGet, seedFallbackQuestions, shuffle, weightedShuffleByQuality } from '../../../lib/grammarPart5';
+import { applyQuestionQuality, fallbackRows, generateGrammarQuestion, isUsableGrammarRow, rowToQuestion, sbGet, seedFallbackQuestions, shuffle, weightedShuffleByQuality } from '../../../lib/grammarPart5';
 
 async function getRows(userId: string) {
   let rows = await sbGet('grammar_questions?select=*&order=question_no.asc&limit=300');
   if (!rows.length) rows = await seedFallbackQuestions(userId);
-  return rows.filter(isUsableGrammarRow);
+  const usable = rows.filter(isUsableGrammarRow);
+  if (usable.length) return usable;
+  const seeded = await seedFallbackQuestions(userId);
+  const usableSeeded = seeded.filter(isUsableGrammarRow);
+  return usableSeeded.length ? usableSeeded : fallbackRows();
 }
 
 function uniqueById(rows: any[]) {
@@ -82,10 +86,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (generatedRows.length < generatedTarget) {
+    const fallbackFill = fallbackRows().filter((row: any) => !generatedSeen.has(String(row.sentence || '').trim().toLowerCase()));
+    const fallbackFinalRows = uniqueBySentence([...dbRows, ...generatedRows, ...fallbackFill]).slice(0, safeCount);
     return res.status(200).json({
       ok: false,
       error: 'AI新規問題を生成できませんでした。既存問題で開始します。コインは消費されません。',
-      questions: uniqueBySentence([...dbRows, ...generatedRows]).slice(0, safeCount).map(rowToQuestion),
+      questions: fallbackFinalRows.map(rowToQuestion),
       fallbackQuestions: dbRows.map(rowToQuestion),
       plan: {
         existingTarget,

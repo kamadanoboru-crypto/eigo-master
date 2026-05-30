@@ -49,7 +49,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!voteRes.ok) {
     const detail = await voteRes.text().catch(() => '');
     console.error('[video-vote] upsert failed', voteRes.status, detail.slice(0, 300));
-    return res.status(500).json({ ok: false, error: 'vote save failed' });
+    const isRls = /row-level security|42501/i.test(detail);
+    return res.status(500).json({
+      ok: false,
+      error: isRls ? 'video_votes RLS policy is missing. Run sql/video_votes_patch.sql in Supabase.' : 'vote save failed',
+      detail: process.env.NODE_ENV === 'development' ? detail.slice(0, 300) : undefined,
+    });
   }
 
   const rowsRes = await fetch(

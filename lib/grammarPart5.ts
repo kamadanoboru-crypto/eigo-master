@@ -59,12 +59,14 @@ export function normalizeGrammarQuestion(q: any) {
   const blankCount = (sentence.match(/_____/g) ?? []).length;
   const options = Array.isArray(q?.options) ? q.options.map(String).map(s => s.trim()).filter(Boolean) : [];
   const correct = String(q?.correct ?? q?.ans ?? '').trim();
+  const ja = String(q?.ja ?? q?.jp ?? '').trim();
   const uniqueOptions = [...new Set(options)];
   if (/\bto\s+_____/.test(sentence) && /^to\b/i.test(correct)) return null;
+  if (/natural Japanese translation|自然な日本語訳/i.test(ja)) return null;
   if (blankCount !== 1 || uniqueOptions.length !== 4 || !uniqueOptions.includes(correct)) return null;
   return {
     s: sentence,
-    ja: String(q?.ja ?? q?.jp ?? '').trim(),
+    ja,
     options: uniqueOptions,
     correct,
     ans: correct,
@@ -212,11 +214,11 @@ Hard requirements:
 - Match TOEIC 600 level business or workplace English.
 - Focus on one grammar point: tense, preposition, conjunction, passive voice, infinitive, participle, or vocabulary.
 - Avoid trivia, ambiguous answers, and awkward English.
-- Write "ja" and "exp" in natural Japanese.
+- Write "ja" and "exp" in natural Japanese. Do not copy the English sentence into "ja".
 - If the blank already follows "to", do not make a "to ..." phrase the correct answer.
 - If the blank needs an infinitive phrase, write the sentence so the blank does not already follow "to".
 
-Return this exact JSON shape with original real content:
+Return this exact JSON shape with original real content. Keep valid JSON:
 {"s":"All expense reports must be approved _____ the finance manager.","ja":"すべての経費報告書は財務マネージャーによって承認されなければなりません。","options":["by","for","with","from"],"correct":"by","exp":"受動態で行為者を表す場合は by を使います。","cat":"preposition","source":"ai"}`;
   try {
     const raw = await callAI(prompt, 700, 'You generate strict JSON for TOEIC Part 5. Output exactly one JSON object and obey every validation rule.');
