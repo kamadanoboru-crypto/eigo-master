@@ -416,19 +416,22 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
   };
   const Talk = () => {
     const categories = [
-      { id: 'general', label: '学習相談', color: '#183153' },
+      { id: 'study', label: '学習相談', color: '#183153' },
       { id: 'toeic', label: 'TOEIC', color: '#B88932' },
-      { id: 'grammar', label: '文法', color: '#0F766E' },
-      { id: 'vocabulary', label: '単語', color: '#6D5BD0' },
-      { id: 'listening', label: 'リスニング', color: '#0369A1' },
-      { id: 'translation', label: '翻訳', color: '#B45309' }
+      { id: 'chat', label: '雑談', color: '#0F766E' },
+      { id: 'app', label: 'アプリ', color: '#6D5BD0' },
+      { id: 'other', label: 'その他', color: '#64748B' }
     ];
+    const normalizeCategory = value => categories.some(cat => cat.id === value) ? value : value === 'general' || value === 'grammar' || value === 'vocabulary' || value === 'listening' || value === 'translation' ? 'study' : 'other';
     const [posts, setPosts] = React.useState([]);
+    const [replies, setReplies] = React.useState([]);
+    const [selectedThread, setSelectedThread] = React.useState(null);
     const [title, setTitle] = React.useState('');
     const [body, setBody] = React.useState('');
-    const [category, setCategory] = React.useState('general');
+    const [category, setCategory] = React.useState('study');
     const [sortMode, setSortMode] = React.useState('popular');
-    const [editing, setEditing] = React.useState(null);
+    const [filterCategory, setFilterCategory] = React.useState('all');
+    const [replyBody, setReplyBody] = React.useState('');
     const [loading, setLoading] = React.useState(false);
     const splitPost = post => {
       const text = String(post?.body || '');
@@ -438,7 +441,8 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
     const loadPosts = React.useCallback(async () => {
       setLoading(true);
       try {
-        const r = await fetch('/api/social/talk?limit=50');
+        const qs = new URLSearchParams({ limit: '50', userId, sort: sortMode, category: filterCategory });
+        const r = await fetch(`/api/social/talk?${qs.toString()}`);
         const d = await r.json().catch(() => ({}));
         setPosts(Array.isArray(d.posts) ? d.posts : []);
       } catch (e) {
@@ -446,41 +450,35 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
       } finally {
         setLoading(false);
       }
-    }, []);
+    }, [filterCategory, sortMode, userId]);
     React.useEffect(() => {
       loadPosts();
     }, [loadPosts]);
-    const sortedPosts = [...posts].sort((a, b) => {
-      if (sortMode === 'new') return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      const scoreA = Number(a.like_count || 0) - Number(a.dislike_count || 0) + Number(a.reply_count || 0) * 2;
-      const scoreB = Number(b.like_count || 0) - Number(b.dislike_count || 0) + Number(b.reply_count || 0) * 2;
-      return scoreB - scoreA || new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-    });
+    const loadReplies = React.useCallback(async thread => {
+      if (!thread?.id) return;
+      try {
+        const qs = new URLSearchParams({ threadId: thread.id, userId, limit: '50' });
+        const r = await fetch(`/api/social/talk?${qs.toString()}`);
+        const d = await r.json().catch(() => ({}));
+        setReplies(Array.isArray(d.posts) ? d.posts : []);
+      } catch (e) {
+        setReplies([]);
+      }
+    }, [userId]);
+    React.useEffect(() => {
+      if (selectedThread) loadReplies(selectedThread);
+    }, [selectedThread, loadReplies]);
+    const sortedPosts = [...posts].filter(post => filterCategory === 'all' || normalizeCategory(post.category) === filterCategory);
     const submitPost = async () => {
       const nextTitle = title.trim() || '学習メモ';
       const nextBody = body.trim();
       if (!nextBody) return;
-      const temp = {
-        id: 'local-' + Date.now(),
-        user_id: userId,
-        nickname: myProfile?.nickname || 'Guest',
-        avatar_emoji: myProfile?.avatar_emoji || 'EB',
-        body: `# ${nextTitle}\n${nextBody}`,
-        category,
-        like_count: 0,
-        dislike_count: 0,
-        reply_count: 0,
-        created_at: new Date().toISOString()
-      };
+      const temp = { id: 'local-' + Date.now(), user_id: userId, nickname: myProfile?.nickname || 'Guest', avatar_emoji: myProfile?.avatar_emoji || '🎓', body: `# ${nextTitle}\n${nextBody}`, category, like_count: 0, dislike_count: 0, reply_count: 0, my_vote: 0, created_at: new Date().toISOString() };
       setPosts(prev => [temp, ...prev]);
       setTitle('');
       setBody('');
       try {
-        const r = await fetch('/api/social/talk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, title: nextTitle, body: nextBody, category, nickname: myProfile?.nickname, avatarEmoji: myProfile?.avatar_emoji })
-        });
+        const r = await fetch('/api/social/talk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, title: nextTitle, body: nextBody, category, nickname: myProfile?.nickname, avatarEmoji: myProfile?.avatar_emoji }) });
         const d = await r.json().catch(() => ({}));
         if (d.ok && d.post) setPosts(prev => prev.map(p => p.id === temp.id ? d.post : p));
         else loadPosts();
@@ -488,92 +486,70 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         loadPosts();
       }
     };
-    const saveEdit = async post => {
-      const nextBody = editing?.body?.trim();
-      const nextTitle = editing?.title?.trim() || '学習メモ';
-      const nextCategory = editing?.category || 'general';
-      if (!nextBody) return;
-      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, body: `# ${nextTitle}\n${nextBody}`, category: nextCategory } : p));
-      setEditing(null);
+    const votePost = async (post, vote) => {
+      const previous = Number(post.my_vote || 0);
+      const nextVote = previous === vote ? 0 : vote;
+      const patchVote = p => p.id === post.id ? { ...p, my_vote: nextVote, like_count: Math.max(0, Number(p.like_count || 0) - (previous === 1 ? 1 : 0) + (nextVote === 1 ? 1 : 0)), dislike_count: Math.max(0, Number(p.dislike_count || 0) - (previous === -1 ? 1 : 0) + (nextVote === -1 ? 1 : 0)) } : p;
+      setPosts(prev => prev.map(patchVote));
+      setReplies(prev => prev.map(patchVote));
+      setSelectedThread(prev => prev?.id === post.id ? patchVote(prev) : prev);
       try {
-        const r = await fetch('/api/social/talk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'edit', postId: post.id, userId, title: nextTitle, body: nextBody, category: nextCategory })
-        });
+        const r = await fetch('/api/social/talk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'vote', postId: post.id, userId, vote }) });
         const d = await r.json().catch(() => ({}));
-        if (d.ok && d.post) {
-          setPosts(prev => prev.map(p => p.id === post.id ? d.post : p));
+        if (d.ok) {
+          const applyServer = p => p.id === post.id ? { ...p, like_count: d.like_count, dislike_count: d.dislike_count, my_vote: d.my_vote } : p;
+          setPosts(prev => prev.map(applyServer));
+          setReplies(prev => prev.map(applyServer));
+          setSelectedThread(prev => prev?.id === post.id ? applyServer(prev) : prev);
+        } else {
+          t$(d.reason || '投票を保存できませんでした', 'warn');
           loadPosts();
         }
-        else loadPosts();
       } catch (e) {
+        t$('投票を保存できませんでした', 'warn');
         loadPosts();
       }
     };
-    const votePost = async (post, vote) => {
-      setPosts(prev => prev.map(p => p.id === post.id ? {
-        ...p,
-        like_count: Math.max(0, Number(p.like_count || 0) + (vote === 1 ? 1 : 0)),
-        dislike_count: Math.max(0, Number(p.dislike_count || 0) + (vote === -1 ? 1 : 0))
-      } : p));
+    const submitReply = async () => {
+      const text = replyBody.trim();
+      if (!selectedThread || !text) return;
+      const temp = { id: 'reply-local-' + Date.now(), user_id: userId, nickname: myProfile?.nickname || 'Guest', avatar_emoji: myProfile?.avatar_emoji || '🎓', body: text, category: selectedThread.category, parent_id: selectedThread.id, thread_id: selectedThread.thread_id || selectedThread.id, like_count: 0, dislike_count: 0, my_vote: 0, created_at: new Date().toISOString() };
+      setReplies(prev => [...prev, temp]);
+      setReplyBody('');
+      setSelectedThread(prev => prev ? { ...prev, reply_count: Number(prev.reply_count || 0) + 1 } : prev);
+      setPosts(prev => prev.map(p => p.id === selectedThread.id ? { ...p, reply_count: Number(p.reply_count || 0) + 1 } : p));
       try {
-        const r = await fetch('/api/social/talk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'vote', postId: post.id, userId, vote })
-        });
+        const r = await fetch('/api/social/talk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId, body: text, parentId: selectedThread.id, category: selectedThread.category, nickname: myProfile?.nickname, avatarEmoji: myProfile?.avatar_emoji }) });
         const d = await r.json().catch(() => ({}));
-        if (d.ok) setPosts(prev => prev.map(p => p.id === post.id ? { ...p, like_count: d.like_count, dislike_count: d.dislike_count } : p));
-      } catch (e) {}
+        if (d.ok && d.post) setReplies(prev => prev.map(p => p.id === temp.id ? d.post : p));
+        else loadReplies(selectedThread);
+      } catch (e) {
+        loadReplies(selectedThread);
+      }
     };
-    return <div className="sa" style={{ padding: 16 }}>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        {[{ id: 'popular', label: '人気順' }, { id: 'new', label: '新着順' }].map(tab => <button key={tab.id} className="bg" style={{ flex: 1, background: sortMode === tab.id ? 'var(--p)' : 'var(--sur)', color: sortMode === tab.id ? '#fff' : 'var(--t2)' }} onClick={() => setSortMode(tab.id)}>{tab.label}</button>)}
-      </div>
-      <div className="sc" style={{ marginBottom: 14 }}>
-        <div className="jp" style={{ fontWeight: 800, marginBottom: 8 }}>学習トークを投稿</div>
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 8 }}>
-          {categories.map(cat => <button key={cat.id} className="bg" style={{ padding: '7px 10px', whiteSpace: 'nowrap', borderColor: category === cat.id ? cat.color : 'var(--bd)', color: category === cat.id ? cat.color : 'var(--t2)' }} onClick={() => setCategory(cat.id)}>{cat.label}</button>)}
-        </div>
-        <input className="url-inp" value={title} onChange={e => setTitle(e.target.value)} placeholder="タイトル" style={{ width: '100%', marginBottom: 8 }} />
-        <textarea className="url-inp" value={body} onChange={e => setBody(e.target.value)} rows={3} placeholder="学習メモ・質問・気づきを書く" style={{ width: '100%', resize: 'vertical', marginBottom: 8 }} />
-        <button className="bp" style={{ width: '100%' }} onClick={submitPost}>投稿する</button>
-      </div>
-      {loading && <div className="empty">読み込み中...</div>}
-      {!loading && sortedPosts.length === 0 && <div className="empty">まだ投稿がありません</div>}
-      {!loading && sortedPosts.map((post, i) => {
-        const isMine = post.user_id === userId;
-        const isEditing = editing?.id === post.id;
-        const cat = categories.find(c => c.id === post.category) || categories[0];
-        const parsed = splitPost(post);
-        return <div key={post.id || i} className="sc" style={{ marginBottom: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 8 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--pl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: 'var(--p)' }}>{post.avatar_emoji || 'EB'}</div>
-            <div style={{ minWidth: 0 }}>
-              <div className="jp" style={{ fontWeight: 800 }}>{post.nickname || post.user_id?.slice?.(0, 8) || 'Guest'}</div>
-              <div style={{ fontSize: 11, color: 'var(--t3)' }}>{post.created_at ? new Date(post.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</div>
-            </div>
-            <span className="strategy-chip" style={{ background: cat.color + '18', color: cat.color }}>{cat.label}</span>
-          </div>
-          {isEditing ? <div style={{ display: 'grid', gap: 8 }}>
-            <select className="url-inp" value={editing.category} onChange={e => setEditing(prev => ({ ...prev, category: e.target.value }))}>{categories.map(cat => <option key={cat.id} value={cat.id}>{cat.label}</option>)}</select>
-            <input className="url-inp" value={editing.title} onChange={e => setEditing(prev => ({ ...prev, title: e.target.value }))} />
-            <textarea className="url-inp" value={editing.body} onChange={e => setEditing(prev => ({ ...prev, body: e.target.value }))} rows={3} />
-            <div style={{ display: 'flex', gap: 8 }}><button className="bp" onClick={() => saveEdit(post)}>保存</button><button className="bg" onClick={() => setEditing(null)}>キャンセル</button></div>
-          </div> : <>
-            <div className="jp" style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>{parsed.title}</div>
-            <div className="jp" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, marginBottom: 10 }}>{parsed.body}</div>
-          </>}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button className="bg" onClick={() => votePost(post, 1)}>いいね {post.like_count || 0}</button>
-            <button className="bg" onClick={() => votePost(post, -1)}>わるいね {post.dislike_count || 0}</button>
-            <span style={{ fontSize: 12, color: 'var(--t3)' }}>回答 {post.reply_count || 0}</span>
-            {isMine && !isEditing && <button className="bg" style={{ marginLeft: 'auto' }} onClick={() => setEditing({ id: post.id, title: parsed.title, body: parsed.body, category: post.category || 'general' })}>編集</button>}
-          </div>
-        </div>;
-      })}
+    const VoteButtons = ({ post }) => <div style={{ display: 'flex', gap: 8, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+      <button className="bg" title="いいね" style={{ minWidth: 58, borderColor: post.my_vote === 1 ? 'var(--a)' : 'var(--bd)', background: post.my_vote === 1 ? '#FEF3C7' : 'var(--sur)' }} onClick={() => votePost(post, 1)}>👍 {post.like_count || 0}</button>
+      <button className="bg" title="わるいね" style={{ minWidth: 58, borderColor: post.my_vote === -1 ? '#FCA5A5' : 'var(--bd)', background: post.my_vote === -1 ? '#FEE2E2' : 'var(--sur)', color: post.my_vote === -1 ? '#DC2626' : 'var(--t)' }} onClick={() => votePost(post, -1)}>👎 {post.dislike_count || 0}</button>
     </div>;
+    const PostCard = ({ post, i = 0, compact = false }) => {
+      const cat = categories.find(c => c.id === normalizeCategory(post.category)) || categories[0];
+      const parsed = splitPost(post);
+      return <div key={post.id || i} className="sc" style={{ marginBottom: 10, cursor: compact ? 'default' : 'pointer' }} onClick={() => !compact && (setSelectedThread(post), setReplies([]))}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 12, background: 'var(--pl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{post.avatar_emoji || '🎓'}</div>
+          <div style={{ minWidth: 0, flex: 1 }}><div className="jp" style={{ fontWeight: 800 }}>{post.nickname || post.user_id?.slice?.(0, 8) || 'Guest'}</div><div style={{ fontSize: 11, color: 'var(--t3)' }}>{post.created_at ? new Date(post.created_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</div></div>
+          <span className="strategy-chip" style={{ background: cat.color + '18', color: cat.color }}>{cat.label}</span>
+        </div>
+        <div className="jp" style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>{parsed.title}</div>
+        <div className="jp" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, marginBottom: 10 }}>{parsed.body}</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><VoteButtons post={post} />{!compact && <span className="bg" style={{ fontSize: 12, padding: '7px 10px', borderColor: 'var(--bd)' }}>💬 {post.reply_count || 0}</span>}</div>
+      </div>;
+    };
+    if (selectedThread) {
+      const parsed = splitPost(selectedThread);
+      return <div className="sa" style={{ padding: 16 }}><button className="bg" style={{ marginBottom: 10 }} onClick={() => { setSelectedThread(null); setReplies([]); loadPosts(); }}>← スレッド一覧</button><PostCard post={selectedThread} compact /><div className="lsec">コメント {selectedThread.reply_count || replies.length || 0}</div><div className="sc" style={{ marginBottom: 12 }}><textarea className="url-inp" value={replyBody} onChange={e => setReplyBody(e.target.value)} rows={3} placeholder={`${parsed.title} へのコメントを書く`} style={{ width: '100%', resize: 'vertical', marginBottom: 8 }} /><button className="bp" style={{ width: '100%' }} disabled={!replyBody.trim()} onClick={submitReply}>コメントする</button></div>{replies.length === 0 && <div className="empty">まだコメントはありません</div>}{replies.map((reply, i) => <PostCard key={reply.id || i} post={reply} i={i} compact />)}</div>;
+    }
+    return <div className="sa" style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>{[{ id: 'popular', label: '人気順' }, { id: 'new', label: '新着順' }].map(tab => <button key={tab.id} className="bg" style={{ flex: 1, background: sortMode === tab.id ? 'var(--p)' : 'var(--sur)', color: sortMode === tab.id ? '#fff' : 'var(--t2)' }} onClick={() => setSortMode(tab.id)}>{tab.label}</button>)}</div><div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 10 }}>{[{ id: 'all', label: 'ALL', color: '#64748B' }, ...categories].map(cat => <button key={cat.id} className="bg" style={{ padding: '7px 10px', whiteSpace: 'nowrap', borderColor: filterCategory === cat.id ? cat.color : 'var(--bd)', color: filterCategory === cat.id ? cat.color : 'var(--t2)' }} onClick={() => setFilterCategory(cat.id)}>{cat.label}</button>)}</div><div className="sc" style={{ marginBottom: 14 }}><div className="jp" style={{ fontWeight: 800, marginBottom: 8 }}>学習トークを投稿</div><div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 8 }}>{categories.map(cat => <button key={cat.id} className="bg" style={{ padding: '7px 10px', whiteSpace: 'nowrap', borderColor: category === cat.id ? cat.color : 'var(--bd)', color: category === cat.id ? cat.color : 'var(--t2)' }} onClick={() => setCategory(cat.id)}>{cat.label}</button>)}</div><input className="url-inp" value={title} onChange={e => setTitle(e.target.value)} placeholder="タイトル" style={{ width: '100%', marginBottom: 8 }} /><textarea className="url-inp" value={body} onChange={e => setBody(e.target.value)} rows={3} placeholder="相談、質問、気づきを書く" style={{ width: '100%', resize: 'vertical', marginBottom: 8 }} /><button className="bp" style={{ width: '100%' }} onClick={submitPost}>投稿する</button></div>{loading && <div className="empty">読み込み中...</div>}{!loading && sortedPosts.length === 0 && <div className="empty">まだ投稿がありません</div>}{!loading && sortedPosts.map((post, i) => <PostCard key={post.id || i} post={post} i={i} />)}</div>;
   };
   const RankingScreen = () => {
     const periods = [{ id: 'daily', label: '今日' }, { id: 'weekly', label: '7日間' }, { id: 'all', label: '累計' }];
@@ -602,11 +578,11 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
   };
   const NicknameModal = () => {
     const [draftName, setDraftName] = React.useState(nickInput || myProfile?.nickname || '');
-    const [draftAvatar, setDraftAvatar] = React.useState(myProfile?.avatar_emoji || 'EB');
+    const [draftAvatar, setDraftAvatar] = React.useState(myProfile?.avatar_emoji || '🎓');
     React.useEffect(() => {
       if (showNickEdit) {
         setDraftName(nickInput || myProfile?.nickname || '');
-        setDraftAvatar(myProfile?.avatar_emoji || 'EB');
+        setDraftAvatar(myProfile?.avatar_emoji || '🎓');
       }
     }, [showNickEdit, nickInput, myProfile?.nickname, myProfile?.avatar_emoji]);
     if (!showNickEdit) return null;
@@ -616,7 +592,7 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         <input className="url-inp" value={draftName} onChange={e => setDraftName(e.target.value)} placeholder="ニックネーム" />
         <div className="jp" style={{ fontSize: 12, color: 'var(--t3)', margin: '12px 0 6px' }}>アイコン</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8 }}>
-          {['EB', 'A+', 'TOEIC', 'AI', '★'].map(icon => <button key={icon} className="bg" style={{ padding: 8, borderColor: draftAvatar === icon ? 'var(--a)' : 'var(--bd)', color: draftAvatar === icon ? 'var(--a)' : 'var(--t2)' }} onClick={() => setDraftAvatar(icon)}>{icon}</button>)}
+          {['🎓', '📘', '🧠', '🔥', '⭐'].map(icon => <button key={icon} className="bg" style={{ padding: 8, borderColor: draftAvatar === icon ? 'var(--a)' : 'var(--bd)', fontSize: 20 }} onClick={() => setDraftAvatar(icon)}>{icon}</button>)}
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
           <button className="bg" style={{ flex: 1 }} onClick={() => setShowNickEdit(false)}>キャンセル</button>
@@ -626,6 +602,9 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
     </div>;
   };
   const Settings = () => {
+    const [health, setHealth] = React.useState(null);
+    const [expanded, setExpanded] = React.useState('');
+    const [checking, setChecking] = React.useState(false);
     const totalSessions = [...TR.word, ...TR.grammar, ...TR.listening, ...TR.shadowing].length;
     const todayCount = streakStats?.todayCount || 0;
     const todayWords = streakStats?.todayWords || 0;
@@ -634,33 +613,59 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
     const lastGrammar = TR.grammar.slice(-1)[0];
     const lastListening = TR.listening.slice(-1)[0];
     const pct = r => r && r.total ? `${Math.round(r.correct / r.total * 100)}%` : '-';
+    const loadHealth = React.useCallback(async () => {
+      setChecking(true);
+      try {
+        const r = await fetch('/api/health/services');
+        const d = await r.json().catch(() => ({}));
+        setHealth(d);
+      } catch (e) {
+        setHealth({ ok: false, services: [], note: '接続状況の取得に失敗しました。' });
+      } finally {
+        setChecking(false);
+      }
+    }, []);
+    React.useEffect(() => {
+      loadHealth();
+    }, [loadHealth]);
+    const statusLabel = s => s === 'healthy' ? '健康' : s === 'limited' ? '上限/制限' : s === 'inactive' ? '未有効' : s === 'disconnected' ? '切断中' : s === 'error' ? 'エラー' : '未確認';
+    const statusColor = s => s === 'healthy' ? '#059669' : s === 'limited' ? '#B45309' : s === 'inactive' ? '#64748B' : s === 'disconnected' ? '#64748B' : s === 'error' ? '#DC2626' : 'var(--t3)';
     return <div className="sa">
       <div className="stlist">
         <div className="sc" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--pl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800, color: 'var(--p)' }}>{myProfile?.avatar_emoji || 'EB'}</div>
+          <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--pl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>{myProfile?.avatar_emoji || '🎓'}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="jp" style={{ fontWeight: 800, fontSize: 16 }}>{myProfile?.nickname || authUser?.email || 'ゲスト学習者'}</div>
-            <div style={{ fontSize: 12, color: 'var(--t3)' }}>{authUser ? 'Googleログイン中' : '未ログイン: 端末内に保存'}</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)' }}>{authUser ? 'Googleログイン中' : '未ログイン: この端末に保存'}</div>
           </div>
           <button className="bg" onClick={() => { setNickInput(myProfile?.nickname || ''); setShowNickEdit(true); }}>名前変更</button>
         </div>
         <div className="stst">学習状況</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>今日の学習</div><div style={{ fontSize: 26, fontWeight: 800, color: 'var(--p)' }}>{todayCount}</div></div>
-          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>連続日数</div><div style={{ fontSize: 26, fontWeight: 800, color: 'var(--a)' }}>{streak}日</div></div>
-          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>今日の単語</div><div style={{ fontSize: 26, fontWeight: 800 }}>{todayWords}</div></div>
-          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>保存アイテム</div><div style={{ fontSize: 26, fontWeight: 800 }}>{saved.length}</div></div>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>今日の学習回数</div><div style={{ fontSize: 26, fontWeight: 800, color: 'var(--p)' }}>{todayCount}<span style={{ fontSize: 13 }}> 回</span></div></div>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>連続日数</div><div style={{ fontSize: 26, fontWeight: 800, color: 'var(--a)' }}>{streak}<span style={{ fontSize: 13 }}> 日</span></div></div>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>今日の保存単語</div><div style={{ fontSize: 26, fontWeight: 800 }}>{todayWords}<span style={{ fontSize: 13 }}> 語</span></div><div className="jp" style={{ fontSize: 11, color: 'var(--t3)' }}>動画字幕や英文から保存した語で増えます。</div></div>
+          <div className="sc"><div className="jp" style={{ fontSize: 12, color: 'var(--t3)' }}>保存した学習メモ</div><div style={{ fontSize: 26, fontWeight: 800 }}>{saved.length}<span style={{ fontSize: 13 }}> 件</span></div><div className="jp" style={{ fontSize: 11, color: 'var(--t3)' }}>保存した字幕・単語・復習用アイテムです。</div></div>
         </div>
         <div className="stst">学習統計</div>
         <div className="sti"><span>学習ポイント</span><strong>{pts} pt</strong></div>
-        <div className="sti"><span>テスト回数</span><strong>{totalSessions}</strong></div>
+        <div className="sti"><span>テスト回数</span><strong>{totalSessions} 回</strong></div>
         <div className="sti"><span>直近単語</span><strong>{pct(lastWord)}</strong></div>
         <div className="sti"><span>直近Part5</span><strong>{pct(lastGrammar)}</strong></div>
         <div className="sti"><span>直近リスニング</span><strong>{pct(lastListening)}</strong></div>
         <div className="stst">ウォレット</div>
         <div className="sti"><span>コイン</span><strong>{wallet.coins}</strong></div>
-        <div className="stst">データ連携</div>
-        <div className="sti"><span>保存状態</span><strong>{SB_READY ? 'クラウド同期' : 'ローカル保存'}</strong></div>
+        <div className="stst">接続状況</div>
+        <button className="bg" style={{ width: '100%', marginBottom: 8 }} onClick={loadHealth}>{checking ? 'チェック中...' : '接続を再チェック'}</button>
+        {(health?.services || []).map(service => <div key={service.id} className="sc" style={{ marginBottom: 8, padding: 12 }} onClick={() => setExpanded(expanded === service.id ? '' : service.id)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+            <div style={{ fontWeight: 800 }}>{service.id}</div>
+            <strong style={{ color: statusColor(service.status) }}>{statusLabel(service.status)}</strong>
+          </div>
+          <div className="jp" style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>{service.message}{typeof service.latencyMs === 'number' ? ` / ${service.latencyMs}ms` : ''}</div>
+          {expanded === service.id && <div className="jp" style={{ fontSize: 11, color: service.lastError ? '#DC2626' : 'var(--t3)', marginTop: 8, whiteSpace: 'pre-wrap' }}>{service.lastError || '直近のチェックエラーはありません。接続回数は各API提供元の管理画面で確認してください。'}</div>}
+        </div>)}
+        <div className="jp" style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.6 }}>{health?.note || 'AIと外部サービスの直近チェック結果を表示します。'}</div>
         <button className="bg" onClick={() => setShowRanking(true)}>ランキングを見る</button>
         {authUser ? <button className="bg" onClick={async () => { await supabaseAuth.signOut(); if (typeof window !== 'undefined') window.location.reload(); }}>ログアウト</button> : <button className="bp" onClick={loginWithGoogle}>Googleでログイン</button>}
       </div>

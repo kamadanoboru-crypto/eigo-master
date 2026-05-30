@@ -12,29 +12,51 @@ const SB_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL  ?? '';
 const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
 const SB_READY = Boolean(SB_URL && SB_ANON);
 
-function hdrs() {
+function hdrs(prefer = 'return=representation') {
   return {
     apikey:        SB_ANON,
     Authorization: `Bearer ${SB_ANON}`,
     'Content-Type': 'application/json',
-    Prefer:        'return=representation',
+    Prefer:        prefer,
   };
 }
 
-async function applyProfiles(posts: any[]) {
+async function applyProfiles(posts: any[], userId = '') {
   if (!Array.isArray(posts) || posts.length === 0) return [];
   const ids = Array.from(new Set(posts.map(post => String(post.user_id || '')).filter(Boolean)));
-  if (!ids.length) return posts;
-  const r = await fetch(
-    `${SB_URL}/rest/v1/profiles?select=user_id,nickname,avatar_emoji&user_id=in.(${ids.map(encodeURIComponent).join(',')})`,
-    { headers: hdrs(), signal: AbortSignal.timeout(5000) }
-  );
-  if (!r.ok) return posts;
-  const profiles = await r.json().catch(() => []);
+  let profiles: any[] = [];
+  if (ids.length) {
+    const r = await fetch(
+      `${SB_URL}/rest/v1/profiles?select=user_id,nickname,avatar_emoji&user_id=in.(${ids.map(encodeURIComponent).join(',')})`,
+      { headers: hdrs(), signal: AbortSignal.timeout(5000) }
+    );
+    profiles = r.ok ? await r.json().catch(() => []) : [];
+  }
   const byId = new Map((Array.isArray(profiles) ? profiles : []).map((p: any) => [String(p.user_id), p]));
+  const postIds = posts.map(post => String(post.id || '')).filter(Boolean);
+  const voteRows = postIds.length
+    ? await fetch(
+      `${SB_URL}/rest/v1/talk_votes?select=post_id,vote,user_id&post_id=in.(${postIds.map(encodeURIComponent).join(',')})&limit=10000`,
+      { headers: hdrs(), signal: AbortSignal.timeout(5000) }
+    ).then(r => r.ok ? r.json() : []).catch(() => [])
+    : [];
+  const voteSummary = new Map<string, any>();
+  (Array.isArray(voteRows) ? voteRows : []).forEach((v: any) => {
+    const id = String(v.post_id || '');
+    const cur = voteSummary.get(id) || { like_count: 0, dislike_count: 0, my_vote: 0 };
+    if (Number(v.vote) === 1) cur.like_count += 1;
+    if (Number(v.vote) === -1) cur.dislike_count += 1;
+    if (userId && String(v.user_id) === String(userId)) cur.my_vote = Number(v.vote);
+    voteSummary.set(id, cur);
+  });
   return posts.map(post => {
     const profile = byId.get(String(post.user_id));
-    return profile ? { ...post, nickname: profile.nickname || post.nickname, avatar_emoji: profile.avatar_emoji || post.avatar_emoji } : post;
+    const votes = voteSummary.get(String(post.id));
+    return {
+      ...post,
+      ...(profile ? { nickname: profile.nickname || post.nickname, avatar_emoji: profile.avatar_emoji || post.avatar_emoji } : {}),
+      ...(votes ? votes : { my_vote: 0 }),
+    };
   });
 }
 
@@ -46,17 +68,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const limit  = Math.min(Number(req.query.limit)  || 30, 50);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
     const threadId = String(req.query.threadId || '');
+    const userId = String(req.query.userId || '');
+    const category = String(req.query.category || '');
+    const sort = String(req.query.sort || 'popular');
     try {
       if (threadId) {
         const r = await fetch(
           `${SB_URL}/rest/v1/talk_posts?select=id,user_id,nickname,avatar_emoji,body,category,parent_id,thread_id,like_count,dislike_count,reply_count,created_at&thread_id=eq.${encodeURIComponent(threadId)}&parent_id=not.is.null&order=created_at.asc&limit=${limit}&offset=${offset}`,
           { headers: hdrs(), signal: AbortSignal.timeout(5000) }
         );
-        if (r.ok) return res.status(200).json({ ok: true, posts: await applyProfiles(await r.json()) });
+        if (r.ok) return res.status(200).json({ ok: true, posts: await applyProfiles(await r.json(), userId) });
       }
 
+      const legacyStudyCategories = ['study', 'general', 'grammar', 'vocabulary', 'listening', 'translation'];
+      const catFilter = category && category !== 'all'
+        ? category === 'study'
+          ? `&category=in.(${legacyStudyCategories.map(encodeURIComponent).join(',')})`
+          : `&category=eq.${encodeURIComponent(category)}`
+        : '';
+      const order = sort === 'new'
+        ? 'order=created_at.desc'
+        : 'order=score.desc,reply_count.desc,last_activity_at.desc';
       const r = await fetch(
-        `${SB_URL}/rest/v1/talk_posts?select=id,user_id,nickname,avatar_emoji,body,category,parent_id,thread_id,like_count,dislike_count,reply_count,last_activity_at,created_at&parent_id=is.null&order=last_activity_at.desc&order=like_count.desc&limit=${limit}&offset=${offset}`,
+        `${SB_URL}/rest/v1/talk_posts?select=id,user_id,nickname,avatar_emoji,body,category,parent_id,thread_id,like_count,dislike_count,reply_count,last_activity_at,created_at&parent_id=is.null${catFilter}&${order}&limit=${limit}&offset=${offset}`,
         { headers: hdrs(), signal: AbortSignal.timeout(5000) }
       );
       if (!r.ok) {
@@ -66,10 +100,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
         if (!fallback.ok) return res.status(200).json({ ok: false, posts: [] });
         const fallbackRows = await fallback.json();
-        return res.status(200).json({ ok: true, posts: await applyProfiles(Array.isArray(fallbackRows) ? fallbackRows : []) });
+        return res.status(200).json({ ok: true, posts: await applyProfiles(Array.isArray(fallbackRows) ? fallbackRows : [], userId) });
       }
       const rows = await r.json();
-      return res.status(200).json({ ok: true, posts: await applyProfiles(Array.isArray(rows) ? rows : []) });
+      return res.status(200).json({ ok: true, posts: await applyProfiles(Array.isArray(rows) ? rows : [], userId) });
     } catch (e) {
       console.error('[talk/GET]', e.message);
       return res.status(200).json({ ok: false, posts: [] });
@@ -84,16 +118,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (action === 'vote') {
       const targetId = String(req.body?.postId || '');
       if (!targetId || ![1, -1].includes(Number(vote))) return res.status(400).json({ ok: false, reason: 'bad vote' });
-      const cur = await fetch(`${SB_URL}/rest/v1/talk_posts?select=like_count,dislike_count&id=eq.${encodeURIComponent(targetId)}&limit=1`, { headers: hdrs() });
-      const [row] = cur.ok ? await cur.json() : [];
-      const like_count = Math.max(0, Number(row?.like_count || 0) + (Number(vote) === 1 ? 1 : 0));
-      const dislike_count = Math.max(0, Number(row?.dislike_count || 0) + (Number(vote) === -1 ? 1 : 0));
+      const previous = await fetch(`${SB_URL}/rest/v1/talk_votes?select=vote&post_id=eq.${encodeURIComponent(targetId)}&user_id=eq.${encodeURIComponent(String(userId))}&limit=1`, { headers: hdrs() });
+      const [prev] = previous.ok ? await previous.json().catch(() => []) : [];
+      const previousVote = Number(prev?.vote || 0);
+      const nextVote = previousVote === Number(vote) ? 0 : Number(vote);
+      if (nextVote === 0) {
+        const del = await fetch(`${SB_URL}/rest/v1/talk_votes?post_id=eq.${encodeURIComponent(targetId)}&user_id=eq.${encodeURIComponent(String(userId))}`, {
+          method: 'DELETE',
+          headers: hdrs('return=minimal'),
+        });
+        if (!del.ok) return res.status(200).json({ ok: false, reason: 'talk_votes table or policy is missing. Run sql/talk_threads_phase1_patch.sql.' });
+      } else {
+        const upsertVote = await fetch(`${SB_URL}/rest/v1/talk_votes?on_conflict=post_id,user_id`, {
+          method: 'POST',
+          headers: hdrs('resolution=merge-duplicates,return=minimal'),
+          body: JSON.stringify({ post_id: targetId, user_id: String(userId), vote: nextVote, updated_at: new Date().toISOString() }),
+        });
+        if (!upsertVote.ok) return res.status(200).json({ ok: false, reason: 'talk_votes table or policy is missing. Run sql/talk_threads_phase1_patch.sql.' });
+      }
+      const votes = await fetch(`${SB_URL}/rest/v1/talk_votes?select=vote&post_id=eq.${encodeURIComponent(targetId)}&limit=10000`, { headers: hdrs() });
+      const rows = votes.ok ? await votes.json().catch(() => []) : [];
+      const like_count = Array.isArray(rows) ? rows.filter((r: any) => Number(r.vote) === 1).length : 0;
+      const dislike_count = Array.isArray(rows) ? rows.filter((r: any) => Number(r.vote) === -1).length : 0;
       const vr = await fetch(`${SB_URL}/rest/v1/talk_posts?id=eq.${encodeURIComponent(targetId)}`, {
         method: 'PATCH',
         headers: hdrs('return=minimal'),
         body: JSON.stringify({ like_count, dislike_count, score: like_count - dislike_count, last_activity_at: new Date().toISOString() }),
       });
-      return res.status(200).json({ ok: vr.ok, like_count, dislike_count });
+      return res.status(200).json({ ok: vr.ok, like_count, dislike_count, my_vote: nextVote });
     }
 
     if (action === 'edit') {
