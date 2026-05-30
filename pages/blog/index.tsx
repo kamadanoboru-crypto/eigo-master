@@ -7,13 +7,13 @@ export default function BlogIndex() {
   return (
     <SiteLayout
       title="学習コラム | Eigo Master"
-      description="TOEIC、英単語、リスニング、シャドーイング、AI英会話に関する英語学習コラム一覧です。"
+      description="TOEIC、単語、Part 5、リスニング、動画字幕学習、AI学習アドバイスに関する英語学習コラム一覧です。"
     >
       <article className={styles.article}>
         <h1>学習コラム</h1>
         <p>
           Eigo Masterでは、アプリで練習するだけでなく、英語学習の進め方を理解できる読み物も掲載しています。
-          TOEIC初心者、単語暗記、YouTubeリスニング、シャドーイング、AI英会話など、学習者がつまずきやすいテーマを具体的に解説します。
+          現在のアプリ機能に合わせ、単語、Part 5、リスニング、動画字幕学習、ニュース読解、AI学習アドバイスを扱います。
         </p>
         <div className={styles.blogList}>
           {blogPosts.map((post) => (

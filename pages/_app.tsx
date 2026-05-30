@@ -9,7 +9,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         <meta name="theme-color" content="#2563EB" />
-        <meta name="description" content="Eigo Masterは、英単語・英文法・動画学習・AI会話練習を組み合わせた英語学習支援サービスです。" />
+        <meta name="description" content="Eigo Masterは、TOEIC頻出単語、Part 5文法、リスニング、動画字幕学習、ニュース読解、AI学習アドバイスを組み合わせた英語学習アプリです。" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Eigo Master" />

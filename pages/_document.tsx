@@ -12,12 +12,12 @@ export default function Document() {
         <meta name="apple-mobile-web-app-title" content="Eigo Master" />
         <meta
           name="description"
-          content="Eigo Masterは、英単語・英文法・動画学習・AI会話練習を組み合わせた英語学習支援サービスです。"
+          content="Eigo Masterは、TOEIC頻出単語、Part 5文法、リスニング、動画字幕学習、ニュース読解、AI学習アドバイスを組み合わせた英語学習アプリです。"
         />
-        <meta property="og:title" content="Eigo Master | AIと動画で続ける英語学習" />
+        <meta property="og:title" content="Eigo Master | TOEIC・動画・AIで続ける英語学習" />
         <meta
           property="og:description"
-          content="英単語・英文法・動画学習・AI会話練習を組み合わせ、毎日少しずつ英語に触れられる環境を提供します。"
+          content="単語、Part 5、リスニング、動画字幕、ニュース読解、AI学習アドバイスで英語学習を続けやすくします。"
         />
         <meta property="og:type" content="website" />
         <script
