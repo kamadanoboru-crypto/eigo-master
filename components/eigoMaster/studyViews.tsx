@@ -998,22 +998,6 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
     const safePage = Math.min(currentPage, totalPages - 1);
     const rows = sortedRows.slice(safePage * pageSize, safePage * pageSize + pageSize);
     const registered = allRows.length;
-    const resource = isWord ? {
-      label: '語彙を増やす補助に',
-      title: 'ランガク',
-      desc: 'マンガで英語に触れる時間を増やせます。',
-      url: 'https://langaku.app/'
-    } : isListening ? {
-      label: '聞く量を増やす補助に',
-      title: 'BBC Learning English',
-      desc: '短い音声で自然な英語の聞き取りを練習できます。',
-      url: 'https://www.bbc.co.uk/learningenglish'
-    } : {
-      label: '反応速度を上げる前に',
-      title: '保存した単語・文を増やす',
-      desc: '動画やニュースで保存した表現が増えるほど練習の幅が広がります。',
-      url: ''
-    };
     const startPractice = () => kind === 'shooter' ? startWordShooter('practice') : startTest(kind === 'word' ? 'wordTest' : 'listeningTest', 'practice');
     const startMain = () => kind === 'shooter' ? startWordShooter('test') : startTest(kind === 'word' ? 'wordTest' : 'listeningTest', 'test');
     return /*#__PURE__*/<div className="sa">{/*#__PURE__*/<div className="lhub">{/*#__PURE__*/<div style={{
@@ -1037,76 +1021,6 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
             gap: 10,
             marginTop: 14
           }}>{/*#__PURE__*/<button className="bg" onClick={startPractice}>{/*#__PURE__*/<CoinCostLabel coins={COIN_COSTS.PRACTICE}>練習する</CoinCostLabel>}</button>}{/*#__PURE__*/<button className="bp" onClick={startMain}>{/*#__PURE__*/<CoinCostLabel coins={COIN_COSTS.TEST}>テスト開始</CoinCostLabel>}</button>}</div>}</div>}{/*#__PURE__*/<div style={{
-          background: "rgba(255,253,248,.9)",
-          border: "1px solid rgba(222,214,200,.82)",
-          borderRadius: "var(--r)",
-          padding: "13px 14px",
-          boxShadow: "var(--sh)",
-          display: "flex",
-          gap: 10,
-          alignItems: "center"
-        }}>{/*#__PURE__*/<div className="lcard-ico" style={{
-            background: isListening ? "#FFF7ED" : isWord ? "var(--pl)" : "#F1F5F9"
-          }}>{I({
-              n: isListening ? "ear" : isWord ? "book" : "play",
-              s: 22,
-              c: isListening ? "#C2410C" : isWord ? "var(--p)" : "#1E293B"
-            })}</div>}{/*#__PURE__*/<div style={{
-            flex: 1,
-            minWidth: 0
-          }}>{/*#__PURE__*/<div className="jp" style={{
-              fontSize: 11,
-              fontWeight: 800,
-              color: "var(--t3)",
-              marginBottom: 2
-            }}>{resource.label}</div>}{/*#__PURE__*/<div className="jp" style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: "var(--t)",
-              lineHeight: 1.35
-            }}>{resource.title}</div>}{/*#__PURE__*/<div className="jp" style={{
-              fontSize: 11,
-              color: "var(--t3)",
-              lineHeight: 1.5
-            }}>{resource.desc}</div>}</div>}{resource.url ? /*#__PURE__*/<a className="bg" href={resource.url} target="_blank" rel="noreferrer" style={{
-            fontSize: 12,
-            padding: "7px 10px",
-            textDecoration: "none",
-            whiteSpace: "nowrap"
-          }}>開く</a> : null}</div>}{/*#__PURE__*/<div style={{
-          background: "rgba(255,253,248,.9)",
-          border: "1px solid rgba(222,214,200,.82)",
-          borderRadius: "var(--r)",
-          padding: "13px 14px",
-          boxShadow: "var(--sh)",
-          display: "flex",
-          gap: 10,
-          alignItems: "center"
-        }}>{/*#__PURE__*/<div className="lcard-ico" style={{
-            background: "#EEF3F8"
-          }}>R</div>}{/*#__PURE__*/<div style={{
-            flex: 1,
-            minWidth: 0
-          }}>{/*#__PURE__*/<div className="jp" style={{
-              fontSize: 11,
-              fontWeight: 800,
-              color: "var(--t3)",
-              marginBottom: 2
-            }}>Recommended app</div>}{/*#__PURE__*/<div className="jp" style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: "var(--t)",
-              lineHeight: 1.35
-            }}>Rizdom</div>}{/*#__PURE__*/<div className="jp" style={{
-              fontSize: 11,
-              color: "var(--t3)",
-              lineHeight: 1.5
-            }}>Build a steady study habit</div>}</div>}{/*#__PURE__*/<a className="bg" href="https://play.google.com/store/apps/details?id=jp.co.benesse.risdomapp" target="_blank" rel="noreferrer" style={{
-            fontSize: 12,
-            padding: "7px 10px",
-            textDecoration: "none",
-            whiteSpace: "nowrap"
-          }}>Open</a>}</div>}{/*#__PURE__*/<div style={{
           display: "grid",
           gridTemplateColumns: "repeat(3,1fr)",
           gap: 8
