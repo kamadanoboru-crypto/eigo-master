@@ -1,11 +1,18 @@
 import type { AppProps } from 'next/app';
 import Head from 'next/head';
 import Script from 'next/script';
+import { useEffect } from 'react';
 import './globals.css';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
 export default function App({ Component, pageProps }: AppProps) {
+  useEffect(() => {
+    import('../lib/nativeAppBridge')
+      .then(({ initNativeAppBridge }) => initNativeAppBridge())
+      .catch(error => console.warn('[native bridge]', error));
+  }, []);
+
   return (
     <>
       <Head>

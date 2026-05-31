@@ -27,15 +27,21 @@ const getSupabaseAuthConfig = () => {
 };
 const supabaseAuth = {
   // Googleログインページへリダイレクト
-  signInWithGoogle: () => {
+  signInWithGoogle: async () => {
     const {
       url: sbUrl
     } = getSupabaseAuthConfig();
     if (!sbUrl) {
       throw new Error('Supabase auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
     }
-    const redirectTo = window.location.origin + '/';
+    const isNative = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+    const redirectTo = isNative ? 'com.englishbase.app://auth' : window.location.origin + '/';
     const url = "".concat(sbUrl.replace(/\/$/, ''), "/auth/v1/authorize?provider=google&redirect_to=").concat(encodeURIComponent(redirectTo));
+    if (isNative) {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url });
+      return;
+    }
     window.location.href = url;
   },
   // ログアウト
@@ -66,6 +72,22 @@ const supabaseAuth = {
     if (token) {
       localStorage.setItem('sb_access_token', token);
       // ユーザー情報取得
+      return {
+        token,
+        user_id
+      };
+    }
+    return null;
+  },
+  getSessionFromUrl: url => {
+    if (!url) return null;
+    const marker = url.includes('#') ? '#' : url.includes('?') ? '?' : '';
+    if (!marker) return null;
+    const params = new URLSearchParams(url.slice(url.indexOf(marker) + 1));
+    const token = params.get('access_token');
+    const user_id = params.get('user_id') || params.get('sub');
+    if (token) {
+      localStorage.setItem('sb_access_token', token);
       return {
         token,
         user_id

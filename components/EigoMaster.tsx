@@ -358,21 +358,40 @@ function EigoMasterInner() {
   // ── Supabase: 初回データロード ──────────────────────────────
   // ── Auth初期化: URLハッシュまたは保存済みセッションから復元 ──
   useEffect(() => {
+    let appUrlListener: any = null;
+    const applyAuthSession = async (session: any) => {
+      if (!(session === null || session === void 0 ? void 0 : session.token)) return false;
+      const user = await supabaseAuth.getUser(session.token);
+      if (user) {
+        localStorage.setItem('sb_user', JSON.stringify(user));
+        setAuthUser({
+          id: user.id,
+          email: user.email,
+          name: user.user_metadata?.full_name || user.email,
+          avatar_url: user.user_metadata?.avatar_url || null
+        });
+        return true;
+      }
+      return false;
+    };
+    const setupNativeAuthReturn = async () => {
+      if (typeof window === 'undefined' || !(window as any).Capacitor?.isNativePlatform?.()) return;
+      const { App } = await import('@capacitor/app');
+      const { Browser } = await import('@capacitor/browser');
+      appUrlListener = await App.addListener('appUrlOpen', async ({ url }) => {
+        const session = supabaseAuth.getSessionFromUrl(url);
+        if (await applyAuthSession(session)) {
+          await Browser.close().catch(() => {});
+          setAuthLoading(false);
+        }
+      });
+    };
     const initAuth = async () => {
       // OAuthコールバック: URLハッシュにtokenがあればセッション確立
       const hashSession = supabaseAuth.getSessionFromHash();
       if (hashSession === null || hashSession === void 0 ? void 0 : hashSession.token) {
-        const user = await supabaseAuth.getUser(hashSession.token);
-        if (user) {
-          var _user_user_metadata, _user_user_metadata1;
-          localStorage.setItem('sb_user', JSON.stringify(user));
-          setAuthUser({
-            id: user.id,
-            email: user.email,
-            name: ((_user_user_metadata = user.user_metadata) === null || _user_user_metadata === void 0 ? void 0 : _user_user_metadata.full_name) || user.email,
-            avatar_url: ((_user_user_metadata1 = user.user_metadata) === null || _user_user_metadata1 === void 0 ? void 0 : _user_user_metadata1.avatar_url) || null
-          });
-          console.log('[Auth] Googleログイン成功:', user.email);
+        if (await applyAuthSession(hashSession)) {
+          console.log('[Auth] Googleログイン成功');
         }
         // URLハッシュをクリア
         history.replaceState(null, '', window.location.pathname);
@@ -398,7 +417,11 @@ function EigoMasterInner() {
       }
       setAuthLoading(false);
     };
+    setupNativeAuthReturn();
     initAuth();
+    return () => {
+      appUrlListener?.remove?.();
+    };
   }, []);
   // ── ウォレット初期化: ログイン時に残高と本日のガチャ残数を取得 ──
   useEffect(() => {
