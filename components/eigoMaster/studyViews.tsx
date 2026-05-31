@@ -385,10 +385,51 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
     ytReaderReady,
     ytReaderRef
   } = deps;
+  const elsaCard = {
+    key: 'elsa',
+    title: 'ELSA Speak',
+    desc: '発音チェックとシャドーイング練習はELSAで行えます。',
+    cta: 'ELSAを開く',
+    emoji: '🎙️',
+    color: '#059669',
+    url: process.env.NEXT_PUBLIC_AFFILIATE_ELSA_URL || 'https://elsaspeak.com/'
+  };
   const Home = () => {
     const hasAiReady = dVids.some(v => captionCache[v.videoId] || STATIC_CAPTION_OVERRIDES[v.videoId]);
     const hasSaved = saved.length > 0;
-    return /*#__PURE__*/<div className="sa">{/*#__PURE__*/<div className="url-sec">{/*#__PURE__*/<div className="url-row">{/*#__PURE__*/<input className="url-inp" placeholder="Paste YouTube URL..." value={urlIn} onChange={e => setUrlIn(e.target.value)} onKeyDown={e => e.key === "Enter" && addUrl()} />}{/*#__PURE__*/<button className="bp" onClick={addUrl}>{"Add (".concat(String.fromCodePoint(0x1FA99)).concat(COIN_COSTS.VIDEO_GENERATION, "コイン)")}</button>}</div>}{urlLd && /*#__PURE__*/<div style={{
+    return /*#__PURE__*/<div className="sa">{/*#__PURE__*/<div className="tabs">{[["all", "\u5171\u6709\u52d5\u753b"], ["my", "MY\u30ea\u30b9\u30c8"], ["review", "\u5fa9\u7fd2"], ["add", "\u8ffd\u52a0"]].map((param, __idx) => {
+          let [k, v] = param;
+          return /*#__PURE__*/<div key={param?.id ?? __idx} className={"tab ".concat(homeTab === k ? "on" : "")} onClick={() => setHomeTab(k)}>{v}</div>;
+        })}</div>}{homeTab === "add" && /*#__PURE__*/<div className="url-sec">{/*#__PURE__*/<div className="jp" style={{
+          fontSize: 13,
+          fontWeight: 800,
+          color: "var(--t)",
+          marginBottom: 8
+        }}>動画を追加してAI字幕学習に変換</div>}{/*#__PURE__*/<div className="jp" style={{
+          fontSize: 12,
+          color: "var(--t2)",
+          lineHeight: 1.7,
+          background: "var(--bg)",
+          border: "1px solid var(--bd)",
+          borderRadius: "var(--rs)",
+          padding: "10px 12px",
+          marginBottom: 10
+        }}>追加した動画と生成された学習データは、共有動画として他のユーザーにも表示されます。{/*#__PURE__*/<br />}共有動画の「いいね」「わるいね」は動画表示の優先度を調整するためのものです。動画や投稿者を本当に悪いと思って押す評価ではありません。</div>}{/*#__PURE__*/<div style={{
+          background: "var(--sur)",
+          border: "1px solid var(--bd)",
+          borderRadius: "var(--r)",
+          padding: "14px 16px",
+          marginBottom: 10
+        }}>{/*#__PURE__*/<div style={{
+            fontSize: 16,
+            fontWeight: 700,
+            color: "var(--t)",
+            marginBottom: 6
+          }}>YouTube動画を追加</div>}{/*#__PURE__*/<div className="jp" style={{
+            fontSize: 13,
+            color: "var(--t2)",
+            lineHeight: 1.7
+          }}>英語動画のURLを貼り付けると{/*#__PURE__*/<br />}AI字幕・対訳・単語学習が始まります</div>}</div>}{/*#__PURE__*/<div className="url-row">{/*#__PURE__*/<input className="url-inp" placeholder="YouTube URLを貼り付け" value={urlIn} onChange={e => setUrlIn(e.target.value)} onKeyDown={e => e.key === "Enter" && addUrl()} />}{/*#__PURE__*/<button className="bp" onClick={addUrl}>{"追加 (".concat(String.fromCodePoint(0x1FA99)).concat(COIN_COSTS.VIDEO_GENERATION, "コイン)")}</button>}</div>}{urlLd && /*#__PURE__*/<div style={{
           display: "flex",
           alignItems: "center",
           gap: 8,
@@ -400,10 +441,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
             fontSize: 13,
             color: "var(--p)",
             fontWeight: 500
-          }}>Loading video...</span>}</div>}</div>}{/*#__PURE__*/<div className="tabs">{[["all", "\u5171\u6709\u52d5\u753b"], ["my", "MY\u30ea\u30b9\u30c8"], ["review", "\u5fa9\u7fd2"]].map((param, __idx) => {
-          let [k, v] = param;
-          return /*#__PURE__*/<div key={param?.id ?? __idx} className={"tab ".concat(homeTab === k ? "on" : "")} onClick={() => setHomeTab(k)}>{v}</div>;
-        })}</div>}{showInstall && /*#__PURE__*/<div className="install-banner">{/*#__PURE__*/<span style={{
+          }}>Loading video...</span>}</div>}</div>}{showInstall && /*#__PURE__*/<div className="install-banner">{/*#__PURE__*/<span style={{
           fontSize: 28,
           flexShrink: 0
         }}>📲</span>}{/*#__PURE__*/<div style={{
@@ -572,7 +610,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
       }}>{[1, 2, 3].map((i, __idx) => /*#__PURE__*/<div key={i?.id ?? __idx} style={{
           height: 82,
           borderRadius: "var(--r)"
-        }} className="skel" />)}</div>}{!dbLoading && dVids.length === 0 ? /*#__PURE__*/<div className="empty">{/*#__PURE__*/<div style={{
+        }} className="skel" />)}</div>}{homeTab !== "add" && (!dbLoading && dVids.length === 0 ? /*#__PURE__*/<div className="empty">{/*#__PURE__*/<div style={{
           fontSize: 48,
           marginBottom: 12
         }}>🎬</div>}{/*#__PURE__*/<div style={{
@@ -580,24 +618,12 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
           fontWeight: 700,
           color: "var(--t)",
           marginBottom: 6
-        }}>Add a YouTube video</div>}{/*#__PURE__*/<div className="jp" style={{
+        }}>まだ動画がありません</div>}{/*#__PURE__*/<div className="jp" style={{
           fontSize: 13,
           color: "var(--t2)",
           marginBottom: 16,
           lineHeight: 1.7
-        }}>英語動画のURLを貼り付けると{/*#__PURE__*/<br />}AI字幕・対訳・単語学習が始まります</div>}{/*#__PURE__*/<div style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 6,
-          justifyContent: "center"
-        }}>{["TED Talks", "BBC News", "English Lessons"].map((s, __idx) => /*#__PURE__*/<span key={s?.id ?? __idx} style={{
-            fontSize: 11,
-            padding: "4px 10px",
-            background: "var(--pl)",
-            color: "var(--p)",
-            borderRadius: 20,
-            fontWeight: 600
-          }}>{s}</span>)}</div>}</div> : /*#__PURE__*/<div className="vlist">{dVids.map((v, __idx) => {
+        }}>動画を追加すると、ここに表示されます。</div>}</div> : /*#__PURE__*/<div className="vlist">{dVids.map((v, __idx) => {
           const thumbSrc = typeof v.thumbnail === 'string' && v.thumbnail.trim() ? v.thumbnail : DEFAULT_THUMBNAIL;
           return /*#__PURE__*/<button key={v?.id ?? __idx} className="vcard" onClick={() => goVideo(v)} aria-label={v.title}>{/*#__PURE__*/<div key={v?.id ?? __idx} className="vth">{/*#__PURE__*/<img key={v?.id ?? __idx} src={thumbSrc} alt="" onError={e => {
                 const img = e.currentTarget;
@@ -701,7 +727,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
                   background: "linear-gradient(90deg,var(--p),var(--a))",
                   transition: "width .4s ease"
                 }} />}</div>}</div>}</button>;
-        })}</div>}{/*#__PURE__*/<SponsorCard />}{/*#__PURE__*/<div className="divhr" />}{/*#__PURE__*/<div style={{
+        })}</div>)}{/*#__PURE__*/<SponsorCard />}{/*#__PURE__*/<div className="divhr" />}{/*#__PURE__*/<div style={{
         margin: "0 16px 8px",
         background: "linear-gradient(135deg,#FFF7ED,#FFEDD5)",
         borderRadius: "var(--r)",
@@ -801,8 +827,8 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
       bg: "#F0FDF4",
       ic: "#059669",
       title: "シャドーイング",
-      desc: "動画の文を音読練習",
-      btext: TR.shadowing.length > 0 ? "".concat(TR.shadowing.length, "回") : "NEW",
+      desc: "発音練習はELSA Speakで行います",
+      btext: "ELSA",
       bcls: "lbs"
     }, {
       id: "shooter",
@@ -837,10 +863,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
             c: "var(--t3)"
           })}</button>}{/*#__PURE__*/<div className="lsec" style={{
           marginTop: 4
-        }}>📝 テスト・学習</div>}{items.map((it, __idx) => /*#__PURE__*/<button key={it?.id ?? __idx} className="lcard" onClick={() => it.id === "grammarTest" ? openGrammarHub() : it.id === "wordTest" ? setScreen("wordHub") : it.id === "listeningTest" ? setScreen("listeningHub") : it.id === "shooter" ? setScreen("shooterHub") : it.id === "shadow" ? (() => {
-          setNavTab("home");
-          setTimeout(() => setShwShow(true), 150);
-        })() : it.id === "analysis" ? setScreen("analysis") : startTest(it.id)}>{/*#__PURE__*/<div key={it?.id ?? __idx} className="lcard-ico" style={{
+        }}>📝 テスト・学習</div>}{items.map((it, __idx) => /*#__PURE__*/<button key={it?.id ?? __idx} className="lcard" onClick={() => it.id === "grammarTest" ? openGrammarHub() : it.id === "wordTest" ? setScreen("wordHub") : it.id === "listeningTest" ? setScreen("listeningHub") : it.id === "shooter" ? setScreen("shooterHub") : it.id === "shadow" ? openAffiliateOffer(elsaCard) : it.id === "analysis" ? setScreen("analysis") : startTest(it.id)}>{/*#__PURE__*/<div key={it?.id ?? __idx} className="lcard-ico" style={{
             background: it.bg
           }}>{I({
               n: it.ico,

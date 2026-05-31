@@ -384,6 +384,15 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     ytReaderReady,
     ytReaderRef
   } = deps;
+  const elsaCard = {
+    key: 'elsa',
+    title: 'ELSA Speak',
+    desc: '発音チェックとシャドーイング練習はELSAで行えます。',
+    cta: 'ELSAを開く',
+    emoji: '🎙️',
+    color: '#059669',
+    url: process.env.NEXT_PUBLIC_AFFILIATE_ELSA_URL || 'https://elsaspeak.com/'
+  };
   const wsResultRecordedRef = React.useRef(false);
   const VideoScreen = () => /*#__PURE__*/<div className="sa">{proc.active && proc.videoId === (curVid === null || curVid === void 0 ? void 0 : curVid.videoId) && /*#__PURE__*/<div style={{
       background: 'linear-gradient(135deg,#0B1F38,#183153)',
@@ -486,10 +495,10 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
       }}>{I({
           n: curCap && isSaved(curCap.id) ? "bkmkF" : "bkmk",
           s: 14
-        })}{curCap && isSaved(curCap.id) ? "保存済" : "保存"}</button>}{/*#__PURE__*/<button className="cbtn cbtn-sh" onClick={() => setShwShow(true)}>{I({
+        })}{curCap && isSaved(curCap.id) ? "保存済" : "保存"}</button>}{/*#__PURE__*/<button className="cbtn cbtn-sh" onClick={() => openAffiliateOffer(elsaCard)}>{I({
           n: "mic",
           s: 14
-        })} シャドー</button>}{/*#__PURE__*/<button className="cbtn cbtn-g" style={{
+        })} ELSAで発音練習</button>}{/*#__PURE__*/<button className="cbtn cbtn-g" style={{
         marginLeft: "auto"
       }} onClick={toggleMyVideo}>{myList.some(v => v.videoId === (curVid === null || curVid === void 0 ? void 0 : curVid.videoId)) ? "".concat(String.fromCodePoint(0x1F4CC), " MY登録済み") : "".concat(String.fromCodePoint(0x1F4CC), " MY追加")}</button>}</div>}{affVis && sett.affOn && /*#__PURE__*/<div style={{
       paddingTop: 8
