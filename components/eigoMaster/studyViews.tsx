@@ -1073,11 +1073,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
             padding: "7px 10px",
             textDecoration: "none",
             whiteSpace: "nowrap"
-          }}>開く</a> : /*#__PURE__*/<button className="bg" style={{
-            fontSize: 12,
-            padding: "7px 10px",
-            whiteSpace: "nowrap"
-          }} onClick={() => setNavTab('home')}>追加</button>}</div>}{/*#__PURE__*/<div style={{
+          }}>開く</a> : null}</div>}{/*#__PURE__*/<div style={{
           background: "rgba(255,253,248,.9)",
           border: "1px solid rgba(222,214,200,.82)",
           borderRadius: "var(--r)",
