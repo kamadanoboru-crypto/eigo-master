@@ -121,7 +121,7 @@ function EigoMasterInner() {
   const [wsPhaseScreen, setWsPhaseScreen] = useState<any>('equip'); // 装備→プレイ→結果
   const [wsEquipped, setWsEquipped] = useState<any>([]); // 装備中スキル名 (max3)
   const [wsCurrentWord, setWsCurrentWord] = useState<any>(null); // 現在落下中の単語
-  const [wsChoices, setWsChoices] = useState<any>([]); // 4択の選択肢(jp)
+  const [wsChoices, setWsChoices] = useState<any>([]); // 8択の選択肢(jp)
   const [wsChoiceResult, setWsChoiceResult] = useState<any>(null); // 選択結果
   const [wsWordQueue, setWsWordQueue] = useState<any>([]); // 残り問題キュー
   const [wsStage, setWsStage] = useState<any>(1); // ステージ番号(1:1個, 2以降:2個同時)
@@ -1209,7 +1209,7 @@ function EigoMasterInner() {
   const existingQuizQuestions = (type, count) => {
     if (type === "wordTest") return weightedStudyShuffle(WORDS, w => `word:${w.id}`).slice(0, count).map((w, __idx) => {
       const correct = w.meaning || '';
-      const wrong = shuffle(WORDS.filter(x => x.id !== w.id && x.meaning !== correct)).slice(0, 7).map(x => x.meaning || '');
+      const wrong = shuffle(WORDS.filter(x => x.id !== w.id && x.meaning !== correct)).slice(0, 3).map(x => x.meaning || '');
       return {
         ...w,
         options: shuffle([correct, ...wrong]),
@@ -1238,6 +1238,21 @@ function EigoMasterInner() {
       return existingQuizQuestions(type, 10);
     }
     return shuffle([...existing, ...generated]).slice(0, count);
+  };
+  const normalizeWordQuestionOptions = q => {
+    if (!q) return q;
+    var _q_correct, _q_meaning;
+    const correct = String((_q_correct = q.correct) !== null && _q_correct !== void 0 ? _q_correct : (_q_meaning = q.meaning) !== null && _q_meaning !== void 0 ? _q_meaning : '').trim();
+    if (!correct) return q;
+    const knownMeanings = new Set(WORDS.map(w => w.meaning).filter(Boolean));
+    const existing = Array.isArray(q.options) ? q.options.map(String).map(s => s.trim()).filter(Boolean) : [];
+    const wrong = existing.filter(opt => opt && opt !== correct && knownMeanings.has(opt));
+    const fill = shuffle(WORDS.map(w => w.meaning).filter(meaning => meaning && meaning !== correct && !wrong.includes(meaning))).slice(0, Math.max(0, 3 - wrong.length));
+    return {
+      ...q,
+      correct,
+      options: shuffle([correct, ...wrong.slice(0, 3), ...fill]).slice(0, 4)
+    };
   };
   const startGrammarPractice = async function () {
     let questionId = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : '',
@@ -1320,7 +1335,8 @@ function EigoMasterInner() {
         }));
       }
       if (type === "grammarTest" && (qs === null || qs === void 0 ? void 0 : qs._meta) && qs._meta.ok === false) t$('Part5 AI generation failed. Existing questions only.', 'warn');
-      const shuffledQs = qs.map(shuffleQuestionOptions);
+      const normalizedQs = type === "wordTest" ? qs.map(normalizeWordQuestionOptions) : qs;
+      const shuffledQs = normalizedQs.map(shuffleQuestionOptions);
       if (type === "wordTest") rememberGeneratedQuestions('word', shuffledQs);
       if (type === "listeningTest") rememberGeneratedQuestions('listening', shuffledQs);
       if (type === "grammarTest") mergeGrammarQuestionsIntoList(shuffledQs);
@@ -1332,7 +1348,7 @@ function EigoMasterInner() {
       t$('Question generation failed. Starting with existing questions.');
       const qs = existingQuizQuestions(type, mode === 'practice' ? 5 : 10);
       resetQuizState(type);
-      setTQs(qs.map(shuffleQuestionOptions));
+      setTQs((type === "wordTest" ? qs.map(normalizeWordQuestionOptions) : qs).map(shuffleQuestionOptions));
       if (!isFree && !(await chargeStartedMode(mode))) resetQuizState('studyHub');
     }
   };

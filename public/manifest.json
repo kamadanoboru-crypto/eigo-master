@@ -1,7 +1,7 @@
 {
-  "name": "Eigo Master - AIと動画で続ける英語学習",
-  "short_name": "Eigo Master",
-  "description": "英単語・英文法・動画学習・AI会話練習を組み合わせた英語学習支援サービスです。",
+  "name": "English Base - AIと動画で続ける英語学習",
+  "short_name": "English Base",
+  "description": "英単語、英文法、動画リスニング、AI学習アドバイスを組み合わせた英語学習支援サービスです。",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F8FAFC",

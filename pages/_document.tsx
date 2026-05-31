@@ -1,5 +1,7 @@
 import { Html, Head, Main, NextScript } from 'next/document';
 
+const SITE_VERIFICATION = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION;
+
 export default function Document() {
   return (
     <Html lang="ja">
@@ -9,15 +11,16 @@ export default function Document() {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Eigo Master" />
+        <meta name="apple-mobile-web-app-title" content="English Base" />
+        {SITE_VERIFICATION ? <meta name="google-site-verification" content={SITE_VERIFICATION} /> : null}
         <meta
           name="description"
-          content="Eigo Masterは、TOEIC頻出単語、Part 5文法、リスニング、動画字幕学習、ニュース読解、AI学習アドバイスを組み合わせた英語学習アプリです。"
+          content="English Baseは、TOEIC、英単語、英文法、動画リスニング、AI学習アドバイスを組み合わせて、毎日の英語学習を続けやすくする学習支援サービスです。"
         />
-        <meta property="og:title" content="Eigo Master | TOEIC・動画・AIで続ける英語学習" />
+        <meta property="og:title" content="English Base | AIと動画で続ける英語学習" />
         <meta
           property="og:description"
-          content="単語、Part 5、リスニング、動画字幕、ニュース読解、AI学習アドバイスで英語学習を続けやすくします。"
+          content="TOEIC、英単語、英文法、動画リスニング、AI学習アドバイスで毎日の英語学習を続けやすくします。"
         />
         <meta property="og:type" content="website" />
         <script

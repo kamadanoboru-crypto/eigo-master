@@ -3,13 +3,18 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { applyQuestionQuality, fallbackRows, generateGrammarQuestion, isUsableGrammarRow, rowToQuestion, sbGet, seedFallbackQuestions, shuffle, weightedShuffleByQuality } from '../../../lib/grammarPart5';
 
 async function getRows(userId: string) {
-  let rows = await sbGet('grammar_questions?select=*&order=question_no.asc&limit=300');
-  if (!rows.length) rows = await seedFallbackQuestions(userId);
-  const usable = rows.filter(isUsableGrammarRow);
-  if (usable.length) return usable;
-  const seeded = await seedFallbackQuestions(userId);
-  const usableSeeded = seeded.filter(isUsableGrammarRow);
-  return usableSeeded.length ? usableSeeded : fallbackRows();
+  try {
+    let rows = await sbGet('grammar_questions?select=*&order=question_no.asc&limit=300');
+    if (!rows.length) rows = await seedFallbackQuestions(userId);
+    const usable = rows.filter(isUsableGrammarRow);
+    if (usable.length) return usable;
+    const seeded = await seedFallbackQuestions(userId);
+    const usableSeeded = seeded.filter(isUsableGrammarRow);
+    return usableSeeded.length ? usableSeeded : fallbackRows();
+  } catch (err) {
+    console.error('[grammar/session:getRows]', err);
+    return fallbackRows();
+  }
 }
 
 function uniqueById(rows: any[]) {

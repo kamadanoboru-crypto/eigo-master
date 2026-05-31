@@ -1,14 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://eigo-master.vercel.app/</loc></url>
-  <url><loc>https://eigo-master.vercel.app/about</loc></url>
-  <url><loc>https://eigo-master.vercel.app/privacy-policy</loc></url>
-  <url><loc>https://eigo-master.vercel.app/terms</loc></url>
-  <url><loc>https://eigo-master.vercel.app/contact</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/toeic-beginner</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/english-vocabulary</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/listening-youtube</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/shadowing</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/ai-english-learning</loc></url>
+  <url><loc>https://eigo-base.vercel.app/</loc></url>
+  <url><loc>https://eigo-base.vercel.app/about</loc></url>
+  <url><loc>https://eigo-base.vercel.app/faq</loc></url>
+  <url><loc>https://eigo-base.vercel.app/privacy-policy</loc></url>
+  <url><loc>https://eigo-base.vercel.app/terms</loc></url>
+  <url><loc>https://eigo-base.vercel.app/contact</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/toeic-beginner-guide</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/toeic-300-to-600</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/toeic-600-to-800</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/toeic-part5-basic</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/vocabulary-review-method</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/adult-english-restart</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/youtube-listening-study</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/shadowing-beginner</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/ai-english-conversation</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/english-study-habit</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/short-time-english-study</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/listening-problem-solution</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/grammar-learning-method</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/toeic-common-mistakes</loc></url>
+  <url><loc>https://eigo-base.vercel.app/blog/english-learning-ai-era</loc></url>
 </urlset>

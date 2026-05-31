@@ -47,7 +47,7 @@ const shuffleQuestionOptions = (q: QuizQuestion): QuizQuestion => {
 
 function wordQuestions(count: number): QuizQuestion[] {
   return shuffle(WORDS).slice(0, count).map(w => {
-    const distractors = shuffle(WORDS.filter(x => x.meaning !== w.meaning)).slice(0, 7).map(x => x.meaning!);
+    const distractors = shuffle(WORDS.filter(x => x.meaning !== w.meaning)).slice(0, 3).map(x => x.meaning!);
     return {
       ...w,
       options: shuffle([w.meaning!, ...distractors]),
@@ -248,8 +248,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       questions = questions.map(q => {
         const correct = String(q.correct ?? q.meaning ?? '').trim();
         const existing = Array.isArray(q.options) ? q.options.map(String).filter(Boolean) : [];
-        const fill = WORDS.map(w => w.meaning).filter((meaning): meaning is string => Boolean(meaning && meaning !== correct && !existing.includes(meaning)));
-        return { ...q, options: shuffle([correct, ...existing.filter(opt => opt !== correct), ...shuffle(fill)]).slice(0, 8), correct };
+        const knownMeanings = new Set(WORDS.map(w => w.meaning).filter(Boolean));
+        const wrong = existing.filter(opt => opt !== correct && knownMeanings.has(opt));
+        const fill = WORDS.map(w => w.meaning).filter((meaning): meaning is string => Boolean(meaning && meaning !== correct && !wrong.includes(meaning)));
+        return { ...q, options: shuffle([correct, ...wrong.slice(0, 3), ...shuffle(fill)]).slice(0, 4), correct };
       });
     }
     if (quizType === 'grammar') {

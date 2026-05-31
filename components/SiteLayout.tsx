@@ -20,9 +20,11 @@ export default function SiteLayout({ title, description, children }: SiteLayoutP
       </Head>
       <div className={styles.container}>
         <header className={styles.header}>
-          <Link href="/" className={styles.logo}>Eigo Master</Link>
-          <nav className={styles.nav}>
+          <Link href="/" className={styles.logo}>English Base</Link>
+          <nav className={styles.nav} aria-label="メインナビゲーション">
+            <Link href="/">ホーム</Link>
             <Link href="/blog">学習コラム</Link>
+            <Link href="/faq">FAQ</Link>
             <Link href="/about">このサイトについて</Link>
             <Link href="/contact">お問い合わせ</Link>
           </nav>
@@ -32,12 +34,13 @@ export default function SiteLayout({ title, description, children }: SiteLayoutP
           <div className={styles.footerLinks}>
             <Link href="/">ホーム</Link>
             <Link href="/blog">学習コラム</Link>
+            <Link href="/faq">FAQ</Link>
             <Link href="/about">このサイトについて</Link>
             <Link href="/terms">利用規約</Link>
             <Link href="/privacy-policy">プライバシーポリシー</Link>
             <Link href="/contact">お問い合わせ</Link>
           </div>
-          <p>&copy; 2026 Eigo Master. 英語学習を毎日の習慣にするための学習支援サービスです。</p>
+          <p>&copy; 2026 English Base. 英語学習を毎日の習慣にするための学習支援サービスです。</p>
         </footer>
       </div>
     </>

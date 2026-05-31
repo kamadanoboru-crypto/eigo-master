@@ -1359,7 +1359,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
           padding: 20,
           textAlign: "center",
           color: "var(--t3)"
-        }}>まだ問題DBが空です。テスト開始で生成してためます。</div>}{!grammarListLoading && grammarList.length > 0 && /*#__PURE__*/<div style={{
+        }}>Supabaseから問題を取得できませんでした。テスト開始で予備問題を使います。</div>}{!grammarListLoading && grammarList.length > 0 && /*#__PURE__*/<div style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -1458,6 +1458,108 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
       isL = screen === "listeningTest";
     const answered = tSel !== null;
     const progress = tIdx / tQs.length * 100;
+    const grammarOptionJapanese = {
+      postponed: '延期された',
+      postponing: '延期すること',
+      postpone: '延期する',
+      postponement: '延期',
+      by: 'までに',
+      until: 'までずっと',
+      since: '以来',
+      for: 'の間 / のために',
+      submit: '提出する',
+      submitting: '提出すること',
+      submitted: '提出された',
+      submission: '提出 / 提出物',
+      effect: '効果 / 発効',
+      affect: '影響する',
+      effort: '努力',
+      efficiency: '効率',
+      Despite: 'にもかかわらず',
+      Although: 'だけれども',
+      However: 'しかしながら',
+      Because: 'なぜなら',
+      Unless: 'でない限り',
+      unless: 'でない限り',
+      if: 'もしなら',
+      while: '一方で / 間に',
+      of: 'の',
+      to: 'へ / に',
+      at: 'で / に',
+      Having: '持っていること / 完了分詞',
+      'After having': 'したあとで',
+      'To have': '持つために',
+      Have: '持つ',
+      'have risen': '上昇している',
+      'are risen': '上昇されている',
+      risen: 'riseの過去分詞',
+      rising: '上昇している',
+      Most: 'ほとんどの',
+      Almost: 'ほとんど',
+      Mostly: '主に',
+      'The most': '最も',
+      hire: '雇う',
+      hiring: '雇用すること',
+      hired: '雇われた',
+      hires: '雇う（三単現）',
+      'provided that': 'もしなら / という条件で',
+      'in spite of': 'にもかかわらず',
+      'due to': 'が原因で',
+      'regardless of': 'に関係なく',
+      unanimously: '満場一致で',
+      ambiguously: '曖昧に',
+      tentatively: '暫定的に',
+      separately: '別々に',
+      revise: '修正する',
+      revising: '修正すること',
+      revised: '修正された',
+      revision: '修正 / 改訂',
+      when: 'するとき',
+      during: 'の間に',
+      with: 'と一緒に / で',
+      from: 'から',
+      review: '確認する',
+      reviewed: '確認された',
+      reviewing: '確認すること',
+      'to review': '確認するために',
+      secure: '安全な',
+      secures: '安全にする',
+      securely: '安全に',
+      security: '安全 / 警備',
+      earlier: 'より早く',
+      early: '早い',
+      earliest: '最も早い',
+      earliness: '早さ',
+      immediately: 'すぐに',
+      immediate: '即時の',
+      immediacy: '即時性',
+      'more immediate': 'より即時の'
+    };
+    const optionStudyLabel = opt => {
+      if (!answered) return '';
+      if (isW) {
+        var _q_word, _q_en;
+        const wordRows = [
+          { word: (_q_word = q.word) !== null && _q_word !== void 0 ? _q_word : q.en, meaning: q.meaning || q.correct },
+          ...WORDS
+        ];
+        const found = wordRows.find(w => String(w.meaning || '').trim() === String(opt).trim());
+      return found === null || found === void 0 ? void 0 : found.word;
+      }
+      if (isG) {
+        var _q_optionMeanings, _q_optionMeanings_opt, _q_optionMeanings1, _q_optionMeanings1_opt;
+        const mapped = (_q_optionMeanings_opt = (_q_optionMeanings = q.optionMeanings) === null || _q_optionMeanings === void 0 ? void 0 : _q_optionMeanings[opt]) !== null && _q_optionMeanings_opt !== void 0 ? _q_optionMeanings_opt : (_q_optionMeanings1_opt = (_q_optionMeanings1 = q.option_meanings) === null || _q_optionMeanings1 === void 0 ? void 0 : _q_optionMeanings1[opt]) !== null && _q_optionMeanings1_opt !== void 0 ? _q_optionMeanings1_opt : grammarOptionJapanese[opt];
+        if (mapped) return mapped;
+        const lower = String(opt).toLowerCase();
+        if (/ly$/.test(lower)) return '副詞形';
+        if (/(tion|ment|ness|ity)$/.test(lower)) return '名詞形';
+        if (/ing$/.test(lower)) return '動名詞 / 現在分詞';
+        if (/ed$/.test(lower)) return '過去形 / 過去分詞';
+        if (/^to\s+/.test(lower)) return 'to不定詞';
+        return '語句の意味';
+      }
+      return '';
+    };
     var _q_quality_likes, _q_quality_dislikes, _q_topExplanation_likes, _ref, _q_topExplanation_dislikes;
     return /*#__PURE__*/<div className="sa">{/*#__PURE__*/<div className="tscr">{/*#__PURE__*/<div className="tpb-w">{/*#__PURE__*/<div className="tpb" style={{
             width: "".concat(progress, "%")
@@ -1545,7 +1647,22 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
             textAlign: "center"
           }}>意味を選んでください</div>}</>}{/*#__PURE__*/<div className="opts">{q.options.map((opt, i) => {
             const cls = optCls(opt);
-            return /*#__PURE__*/<button key={opt?.id ?? i} className={"opt ".concat(cls)} disabled={answered} onClick={() => pickOpt(opt)}>{/*#__PURE__*/<span key={opt?.id ?? i} className="jp">{opt}</span>}{cls === "ok" && I({
+            const studyLabel = optionStudyLabel(opt);
+            return /*#__PURE__*/<button key={opt?.id ?? i} className={"opt ".concat(cls)} disabled={answered} onClick={() => pickOpt(opt)}>{/*#__PURE__*/<span key={opt?.id ?? i} className="jp" style={{
+                flex: 1,
+                minWidth: 0,
+                textAlign: 'left'
+              }}>{opt}</span>}{studyLabel && /*#__PURE__*/<span key={opt?.id ?? i} className="jp" style={{
+                marginLeft: 'auto',
+                fontSize: 12,
+                color: cls === "ng" ? "#991B1B" : cls === "ok" ? "#065F46" : "var(--t2)",
+                fontWeight: 700,
+                textAlign: 'right',
+                maxWidth: '48%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>{studyLabel}</span>}{cls === "ok" && I({
                 n: "ok",
                 s: 18,
                 c: "var(--ok)"

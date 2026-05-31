@@ -3,11 +3,12 @@ import { callAI, parseJSON } from './aiClient';
 
 export const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 export const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+const SB_USES_BEARER = SB_ANON.startsWith('eyJ');
 
 export function sbHeaders(extra: Record<string, string> = {}) {
   return {
     apikey: SB_ANON,
-    Authorization: `Bearer ${SB_ANON}`,
+    ...(SB_USES_BEARER ? { Authorization: `Bearer ${SB_ANON}` } : {}),
     'Content-Type': 'application/json',
     ...extra,
   };
@@ -15,32 +16,57 @@ export function sbHeaders(extra: Record<string, string> = {}) {
 
 export async function sbGet(path: string) {
   if (!SB_URL) return [];
-  const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: sbHeaders() });
-  if (!r.ok) return [];
-  return r.json();
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: sbHeaders() });
+    if (!r.ok) {
+      console.warn(`[supabase:get] ${r.status} ${path}`);
+      return [];
+    }
+    const json = await r.json();
+    return Array.isArray(json) ? json : [];
+  } catch (err) {
+    console.warn(`[supabase:get] failed ${path}`, err);
+    return [];
+  }
 }
 
 export async function sbPost(table: string, body: unknown, prefer = 'return=representation') {
   if (!SB_URL) return null;
-  const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
-    method: 'POST',
-    headers: sbHeaders({ Prefer: prefer }),
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) return null;
-  if (prefer.includes('return=minimal')) return [];
-  return r.json();
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: sbHeaders({ Prefer: prefer }),
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      console.warn(`[supabase:post] ${r.status} ${table}`);
+      return null;
+    }
+    if (prefer.includes('return=minimal')) return [];
+    return r.json();
+  } catch (err) {
+    console.warn(`[supabase:post] failed ${table}`, err);
+    return null;
+  }
 }
 
 export async function sbPatch(path: string, body: unknown) {
   if (!SB_URL) return null;
-  const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
-    method: 'PATCH',
-    headers: sbHeaders({ Prefer: 'return=representation' }),
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) return null;
-  return r.json();
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
+      method: 'PATCH',
+      headers: sbHeaders({ Prefer: 'return=representation' }),
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      console.warn(`[supabase:patch] ${r.status} ${path}`);
+      return null;
+    }
+    return r.json();
+  } catch (err) {
+    console.warn(`[supabase:patch] failed ${path}`, err);
+    return null;
+  }
 }
 
 export const FALLBACK_GRAMMAR = [
