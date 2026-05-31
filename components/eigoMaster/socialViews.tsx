@@ -636,16 +636,13 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
   };
   const Settings = () => {
     const [health, setHealth] = React.useState(null);
+    const [healthOpen, setHealthOpen] = React.useState(false);
     const [expanded, setExpanded] = React.useState('');
     const [checking, setChecking] = React.useState(false);
     const totalSessions = [...TR.word, ...TR.grammar, ...TR.listening, ...TR.shadowing].length;
     const todayCount = streakStats?.todayCount || 0;
     const todayWords = streakStats?.todayWords || 0;
     const streak = streakStats?.streak || 0;
-    const lastWord = TR.word.slice(-1)[0];
-    const lastGrammar = TR.grammar.slice(-1)[0];
-    const lastListening = TR.listening.slice(-1)[0];
-    const pct = r => r && r.total ? `${Math.round(r.correct / r.total * 100)}%` : '-';
     const loadHealth = React.useCallback(async () => {
       setChecking(true);
       try {
@@ -658,9 +655,11 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         setChecking(false);
       }
     }, []);
-    React.useEffect(() => {
-      loadHealth();
-    }, [loadHealth]);
+    const toggleHealth = React.useCallback(() => {
+      const next = !healthOpen;
+      setHealthOpen(next);
+      if (next && !health && !checking) loadHealth();
+    }, [checking, health, healthOpen, loadHealth]);
     const statusLabel = s => s === 'healthy' ? '健康' : s === 'limited' ? '上限/制限' : s === 'inactive' ? '未有効' : s === 'disconnected' ? '切断中' : s === 'error' ? 'エラー' : '未確認';
     const statusColor = s => s === 'healthy' ? '#059669' : s === 'limited' ? '#B45309' : s === 'inactive' ? '#64748B' : s === 'disconnected' ? '#64748B' : s === 'error' ? '#DC2626' : 'var(--t3)';
     return <div className="sa">
@@ -683,22 +682,24 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         <div className="stst">学習統計</div>
         <div className="sti"><span>学習ポイント</span><strong>{pts} pt</strong></div>
         <div className="sti"><span>テスト回数</span><strong>{totalSessions} 回</strong></div>
-        <div className="sti"><span>直近単語</span><strong>{pct(lastWord)}</strong></div>
-        <div className="sti"><span>直近Part5</span><strong>{pct(lastGrammar)}</strong></div>
-        <div className="sti"><span>直近リスニング</span><strong>{pct(lastListening)}</strong></div>
         <div className="stst">ウォレット</div>
         <div className="sti"><span>コイン</span><strong>{wallet.coins}</strong></div>
-        <div className="stst">接続状況</div>
-        <button className="bg" style={{ width: '100%', marginBottom: 8 }} onClick={loadHealth}>{checking ? 'チェック中...' : '接続を再チェック'}</button>
-        {(health?.services || []).map(service => <div key={service.id} className="sc" style={{ marginBottom: 8, padding: 12 }} onClick={() => setExpanded(expanded === service.id ? '' : service.id)}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-            <div style={{ fontWeight: 800 }}>{service.id}</div>
-            <strong style={{ color: statusColor(service.status) }}>{statusLabel(service.status)}</strong>
-          </div>
-          <div className="jp" style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>{service.message}{typeof service.latencyMs === 'number' ? ` / ${service.latencyMs}ms` : ''}</div>
-          {expanded === service.id && <div className="jp" style={{ fontSize: 11, color: service.lastError ? '#DC2626' : 'var(--t3)', marginTop: 8, whiteSpace: 'pre-wrap' }}>{service.lastError || '直近のチェックエラーはありません。接続回数は各API提供元の管理画面で確認してください。'}</div>}
-        </div>)}
-        <div className="jp" style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.6 }}>{health?.note || 'AIと外部サービスの直近チェック結果を表示します。'}</div>
+        <button className="bg" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }} onClick={toggleHealth}>
+          <span>接続状況</span>
+          <span>{healthOpen ? '△' : '▽'}</span>
+        </button>
+        {healthOpen && <>
+          <button className="bg" style={{ width: '100%', marginTop: 8, marginBottom: 8 }} onClick={loadHealth}>{checking ? 'チェック中...' : '接続を再チェック'}</button>
+          {(health?.services || []).map(service => <div key={service.id} className="sc" style={{ marginBottom: 8, padding: 12 }} onClick={() => setExpanded(expanded === service.id ? '' : service.id)}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+              <div style={{ fontWeight: 800 }}>{service.id}</div>
+              <strong style={{ color: statusColor(service.status) }}>{statusLabel(service.status)}</strong>
+            </div>
+            <div className="jp" style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>{service.message}{typeof service.latencyMs === 'number' ? ` / ${service.latencyMs}ms` : ''}</div>
+            {expanded === service.id && <div className="jp" style={{ fontSize: 11, color: service.lastError ? '#DC2626' : 'var(--t3)', marginTop: 8, whiteSpace: 'pre-wrap' }}>{service.lastError || '直近のチェックエラーはありません。接続回数は各API提供元の管理画面で確認してください。'}</div>}
+          </div>)}
+          <div className="jp" style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.6 }}>{health?.note || 'AIと外部サービスの直近チェック結果を表示します。'}</div>
+        </>}
         <button className="bg" onClick={() => setShowRanking(true)}>ランキングを見る</button>
         {authUser ? <button className="bg" onClick={async () => { await supabaseAuth.signOut(); if (typeof window !== 'undefined') window.location.reload(); }}>ログアウト</button> : <button className="bp" onClick={loginWithGoogle}>Googleでログイン</button>}
       </div>
