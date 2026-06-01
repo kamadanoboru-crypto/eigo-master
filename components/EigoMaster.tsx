@@ -4,6 +4,7 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import { CoinCostLabel, ErrorBoundary } from "./common";
 import { CSS } from "./eigoMaster/styles";
 import { useEigoMasterViews } from "./eigoMaster/views";
+import { showRewardedAd } from "../lib/admobRewarded";
 import { DEFAULT_THUMBNAIL, SB_URL_AUTH, SB_ANON_AUTH, REWARD_ADS_ENABLED, MAX_STUDY_CAPTIONS, getSupabaseAuthConfig, supabaseAuth, SB_URL, SB_KEY, SB_READY, sbFrom, getUserId, GLOBAL_VIDEOS, STATIC_CAPTION_OVERRIDES, AFF_CARDS, getAffCard, AFF, RAKUTEN_TOEIC_OFFICIAL_URL, RAKUTEN_TOEIC_OFFICIAL_IMAGE, WORDS, GRAMMAR, LISTENING, GACHA_PRIZES, COIN_COSTS, AI_LIMIT_MESSAGE, isAiLimitError, shuffle, shuffleQuestionOptions, getSourceType, fetchQuiz, genWord, genGrammar, fetchGrammarList, fetchGrammarSession, saveGrammarAttempt, genListening, formatPart5Sentence, getPart5Japanese, calcToeic, toeicConfidence, spLevel, affLevel, stars, I, fetchVideoInfo, buildTimedSentences, fetchTranscript, aiGenerateChunks, looksLikeLegacyChunkMeaning, refreshJapaneseImagesIfNeeded, fetchBBCNews, fetchPageSixNews, splitSentences, aiWordMeaning, aiTranslateSentence, aiTranslateAll, dbSaveVideo, dbLoadVideos, dbSaveCaptions, dbLoadCaptions } from "./eigoMaster/core";
 
 // ErrorBoundaryでラップしてデフォルトエクスポート
@@ -67,6 +68,8 @@ function EigoMasterInner() {
   const [rewShow, setRewShow] = useState<any>(false);
   const [rewPct, setRewPct] = useState<any>(0);
   const [rewCb, setRewCb] = useState<any>(null);
+  const [rewStatus, setRewStatus] = useState<any>('idle');
+  const rewardAdInFlightRef = useRef(false);
   // points / gacha
   const [pts, setPts] = useState<any>(() => {
     try {
@@ -1824,28 +1827,47 @@ function EigoMasterInner() {
       t$('ログイン設定が未完了です。Supabaseの環境変数を確認してください。', 'warn');
     }
   };
-  const openRew = cb => {
-    if (!sett.rewOn || !REWARD_ADS_ENABLED) {
-      t$('広告プロバイダ未設定のため、スポンサー導線を開きます', 'warn');
-      openAffiliateOffer();
-      cb && cb();
+  const openRew = async function (cb) {
+    let reason = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 'ai';
+    if (rewardAdInFlightRef.current) {
+      t$('広告を表示中です。完了までお待ちください。', 'warn');
       return;
     }
+    if (!sett.rewOn || !REWARD_ADS_ENABLED) {
+      t$('広告機能が無効です。Androidアプリで設定後に利用できます。', 'warn');
+      return;
+    }
+    rewardAdInFlightRef.current = true;
     setRewCb(() => cb);
-    setRewPct(0);
+    setRewPct(10);
+    setRewStatus('広告を読み込んでいます');
     setRewShow(true);
-    let p = 0;
-    const iv = setInterval(() => {
-      p += 3.33;
-      setRewPct(Math.min(p, 100));
-      if (p >= 100) {
-        clearInterval(iv);
-        setTimeout(() => {
-          setRewShow(false);
-          cb && cb();
-        }, 300);
+    let progressTimer = null;
+    try {
+      progressTimer = setInterval(() => {
+        setRewPct(p => Math.min(90, p + 8));
+      }, 450);
+      const result = await showRewardedAd(reason);
+      if (progressTimer) clearInterval(progressTimer);
+      if (result.success && result.rewardEarned) {
+        setRewPct(100);
+        setRewStatus(reason === 'gacha' ? '視聴完了：ガチャを実行します' : '視聴完了：報酬を獲得しました');
+        await Promise.resolve(cb && cb());
+        t$(reason === 'gacha' ? '視聴完了：ガチャ報酬を獲得しました' : '視聴完了：報酬を獲得しました', 'ok');
+        setTimeout(() => setRewShow(false), 350);
+        return;
       }
-    }, 100);
+      setRewStatus(result.error || '広告の読み込みに失敗しました');
+      t$(result.error || '広告の読み込みに失敗しました。時間をおいて再度お試しください', 'warn');
+      setTimeout(() => setRewShow(false), 700);
+    } catch (e) {
+      if (progressTimer) clearInterval(progressTimer);
+      setRewStatus('広告の読み込みに失敗しました');
+      t$('広告の読み込みに失敗しました。時間をおいて再度お試しください', 'warn');
+      setTimeout(() => setRewShow(false), 700);
+    } finally {
+      rewardAdInFlightRef.current = false;
+    }
   };
   const SponsorCard = param => {
     let {
@@ -2601,6 +2623,7 @@ function EigoMasterInner() {
     rewCb,
     rewPct,
     rewShow,
+    rewStatus,
     saveGrammarAttempt,
     saveProfile,
     saved,
@@ -3426,7 +3449,7 @@ function EigoMasterInner() {
             })}{/*#__PURE__*/<div className="jp" style={{
               fontSize: 14,
               fontWeight: 700
-            }}>広告を視聴中...</div>}</div>}{/*#__PURE__*/<div style={{
+            }}>{rewStatus && rewStatus !== 'idle' ? rewStatus : '広告を表示しています'}</div>}</div>}{/*#__PURE__*/<div style={{
             background: "#1e293b",
             borderRadius: 12,
             aspectRatio: "16/9",
