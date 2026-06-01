@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { CoinCostLabel } from "../common";
 import { YouTubeEmbed } from "../video/VideoPlayer";
 import type { EigoMasterViewDeps } from "./viewTypes";
+import { NEWS_COUNTRIES, NEWS_COUNTRY_ORDER } from "../../lib/newsCountries";
 export function useMediaViews(deps: EigoMasterViewDeps) {
   const {
     AFF,
@@ -132,6 +133,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     myProfile,
     navTab,
     newsScreen,
+    newsCountry,
     newsSource,
     nextQ,
     nickInput,
@@ -218,6 +220,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     setMyProfile,
     setNavTab,
     setNewsScreen,
+    setNewsCountry,
     setNewsSource,
     setNickInput,
     setPlay,
@@ -1338,6 +1341,58 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
   // NEWS SCREENS
   // ════════════════════════════════════════════════════════════════
   // ── ニュースハブ ─────────────────────────────────────────────
+  const NewsCountryHub = () => /*#__PURE__*/<div className="sa">{/*#__PURE__*/<div className="nhub">{/*#__PURE__*/<div style={{
+        fontSize: 11,
+        fontWeight: 700,
+        color: "var(--t3)",
+        textTransform: "uppercase",
+        letterSpacing: .5,
+        padding: "0 2px"
+      }}>News Country</div>}{/*#__PURE__*/<div style={{
+        background: "linear-gradient(135deg,#183153,#2F5D62,#5F4724)",
+        borderRadius: "var(--r)",
+        padding: "18px 16px",
+        color: "#fff",
+        boxShadow: "0 14px 34px rgba(24,49,83,.18)",
+        border: "1px solid rgba(255,255,255,.14)"
+      }}>{/*#__PURE__*/<div className="jp" style={{
+          fontSize: 18,
+          fontWeight: 800,
+          marginBottom: 8
+        }}>海外生活を先取りするニュース学習</div>}{/*#__PURE__*/<div className="jp" style={{
+          fontSize: 12,
+          lineHeight: 1.75,
+          opacity: .9
+        }}>普段見ているニュースを、海外で見るであろうニュースに置き換える。アメリカ・インド・フィリピンのニュースを通じて、英語だけでなく現地感覚にも触れる。</div>}</div>}{NEWS_COUNTRY_ORDER.map(key => {
+        const country = NEWS_COUNTRIES[key];
+        return /*#__PURE__*/<button key={key} className="nsvc" style={{
+          width: "100%",
+          textAlign: "left",
+          border: key === 'us' ? "2px solid var(--p)" : "1px solid var(--bd)",
+          cursor: "pointer"
+        }} onClick={() => openNewsCountry(key)}>{/*#__PURE__*/<div className="nsvc-hd">{/*#__PURE__*/<div className="nsvc-ico" style={{
+              background: key === 'us' ? "#183153" : key === 'india' ? "#F0FDF4" : "#EFF6FF",
+              color: key === 'us' ? "#fff" : key === 'india' ? "#047857" : "#1D4ED8",
+              fontSize: 13,
+              fontWeight: 800
+            }}>{country.shortLabel}</div>}{/*#__PURE__*/<div style={{
+              flex: 1
+            }}>{/*#__PURE__*/<div className="nsvc-t">{country.label} {/*#__PURE__*/<span style={{
+                  fontSize: 11,
+                  background: key === 'us' ? "var(--pl)" : "#F8FAFC",
+                  color: key === 'us' ? "var(--p)" : "var(--t2)",
+                  padding: "1px 6px",
+                  borderRadius: 4,
+                  fontWeight: 600,
+                  marginLeft: 4
+                }}>{country.badge}</span>}</div>}{/*#__PURE__*/<div className="nsvc-d">{country.description}</div>}</div>}{I({
+              n: "chR",
+              s: 18,
+              c: key === 'us' ? "var(--p)" : "var(--t3)"
+            })}</div>}</button>;
+      })}</div>}{/*#__PURE__*/<div style={{
+      height: 20
+    }} />}</div>;
   const NewsHub = () => /*#__PURE__*/<div className="sa">{/*#__PURE__*/<div className="nhub">{/*#__PURE__*/<div style={{
         fontSize: 11,
         fontWeight: 700,
@@ -1590,7 +1645,11 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
   // ── BBC記事リスト ─────────────────────────────────────────────
   const BBCList = () => {
     const isPageSix = newsSource === 'pagesix';
-    const CATS = isPageSix ? [{
+    const countryConfig = NEWS_COUNTRIES[newsCountry] || NEWS_COUNTRIES.us;
+    const CATS = !isPageSix && newsCountry !== 'us' ? countryConfig.feeds.map(feed => ({
+      id: feed.id,
+      label: feed.label
+    })) : isPageSix ? [{
       id: "latest",
       label: "✨ 最新"
     }, {
@@ -1634,7 +1693,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
         }} />}{/*#__PURE__*/<div className="jp" style={{
           fontSize: 13,
           color: "var(--t3)"
-        }}>{isPageSix ? 'Page Six' : 'BBC'} RSSを読み込み中...</div>}</div>}{!bbcLoading && bbcArticles.length === 0 && /*#__PURE__*/<div className="empty">{/*#__PURE__*/<div style={{
+        }}>{isPageSix ? 'Page Six' : newsCountry === 'us' ? 'BBC' : countryConfig.label} RSSを読み込み中...</div>}</div>}{!bbcLoading && bbcArticles.length === 0 && /*#__PURE__*/<div className="empty">{/*#__PURE__*/<div style={{
           fontSize: 40,
           marginBottom: 10
         }}>📡</div>}{/*#__PURE__*/<div className="jp" style={{
@@ -1657,7 +1716,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
         }}>{/*#__PURE__*/<div className="jp" style={{
             fontSize: 12,
             color: "var(--t3)"
-          }}>{bbcArticles.length}件のRSS要約</div>}{/*#__PURE__*/<a href={isPageSix ? "https://pagesix.com/" : "https://www.bbc.com/news"} target="_blank" rel="noreferrer" style={{
+          }}>{bbcArticles.length}件のRSS要約</div>}{/*#__PURE__*/<a href={isPageSix ? "https://pagesix.com/" : countryConfig.sourceHomeUrl} target="_blank" rel="noreferrer" style={{
             fontSize: 11,
             color: "var(--p)",
             display: "flex",
@@ -1665,7 +1724,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
             gap: 4,
             fontWeight: 600,
             textDecoration: "none"
-          }}>{isPageSix ? 'PageSix.com' : 'BBC.com'}で開く {I({
+          }}>{isPageSix ? 'PageSix.com' : newsCountry === 'us' ? 'BBC.com' : countryConfig.label}で開く {I({
               n: "extlnk",
               s: 12,
               c: "var(--p)"
@@ -1676,7 +1735,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
               padding: "2px 6px",
               borderRadius: 4,
               fontWeight: 600
-            }}>{isPageSix ? 'Page Six' : 'BBC'}</span>}{/*#__PURE__*/<span key={art?.id ?? __idx}>{new Date(art.pubDate).toLocaleDateString("ja-JP", {
+            }}>{isPageSix ? 'Page Six' : art.sourceLabel || (newsCountry === 'us' ? 'BBC' : countryConfig.label)}</span>}{/*#__PURE__*/<span key={art?.id ?? __idx}>{new Date(art.pubDate).toLocaleDateString("ja-JP", {
                 month: "short",
                 day: "numeric"
               })}</span>}{/*#__PURE__*/<span key={art?.id ?? __idx} style={{
@@ -2241,19 +2300,37 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
   // ── BBC記事リスト読み込み ────────────────────────────────── ──────────────────────────────────
   const loadBBCFeed = async function (feed) {
     let source = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : newsSource;
+    let country = arguments.length > 2 && arguments[2] !== void 0 ? arguments[2] : newsCountry;
     setBbcFeed(feed);
     setBbcLoading(true);
     setBbcArticles([]);
-    const articles = source === 'pagesix' ? await fetchPageSixNews(feed) : await fetchBBCNews(feed);
+    const articles = source === 'pagesix' ? await fetchPageSixNews(feed) : await fetchBBCNews(feed, country);
     setBbcArticles(articles);
     setBbcLoading(false);
   };
-  const openBBCList = () => {
+  const openNewsCountry = key => {
+    setNewsCountry(key);
+    setBbcArticles([]);
+    if (key === 'us') {
+      setNewsScreen('hub');
+      setNewsSource('bbc');
+      setBbcFeed('world');
+      return;
+    }
+    const firstFeed = NEWS_COUNTRIES[key].feeds[0].id;
     setNewsSource('bbc');
     setNewsScreen('bbcList');
-    if (bbcArticles.length === 0 || newsSource !== 'bbc') loadBBCFeed('world', 'bbc');
+    setBbcFeed(firstFeed);
+    loadBBCFeed(firstFeed, 'bbc', key);
+  };
+  const openBBCList = () => {
+    setNewsCountry('us');
+    setNewsSource('bbc');
+    setNewsScreen('bbcList');
+    if (bbcArticles.length === 0 || newsSource !== 'bbc' || newsCountry !== 'us') loadBBCFeed('world', 'bbc', 'us');
   };
   const openPageSixList = () => {
+    setNewsCountry('us');
     setNewsSource('pagesix');
     setNewsScreen('bbcList');
     setBbcFeed('latest');
@@ -2407,6 +2484,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
   // ─────────────────────────────────────────────────────────────
 
   return {
+    NewsCountryHub,
     VideoScreen,
     Saved,
     Advice,

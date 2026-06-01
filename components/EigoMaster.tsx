@@ -136,7 +136,8 @@ function EigoMasterInner() {
     heal: 0
   });
   // ── ニュース state ──
-  const [newsScreen, setNewsScreen] = useState<any>('hub'); // hub|bbcList|bbcReader
+  const [newsScreen, setNewsScreen] = useState<any>('countryHub'); // countryHub|hub|bbcList|bbcReader
+  const [newsCountry, setNewsCountry] = useState<any>('us');
   const [newsSource, setNewsSource] = useState<any>('bbc');
   const [bbcFeed, setBbcFeed] = useState<any>('world');
   const [bbcArticles, setBbcArticles] = useState<any>([]);
@@ -2452,6 +2453,7 @@ function EigoMasterInner() {
     Gacha,
     ParallelReader,
     WordShooter,
+    NewsCountryHub,
     NewsHub,
     BBCList,
     BBCReader,
@@ -2587,6 +2589,7 @@ function EigoMasterInner() {
     myProfile,
     navTab,
     newsScreen,
+    newsCountry,
     newsSource,
     nextQ,
     nickInput,
@@ -2674,6 +2677,7 @@ function EigoMasterInner() {
     setMyProfile,
     setNavTab,
     setNewsScreen,
+    setNewsCountry,
     setNewsSource,
     setNickInput,
     setPlay,
@@ -2870,6 +2874,7 @@ function EigoMasterInner() {
       if (newsScreen === "parallelReader") return /*#__PURE__*/<ParallelReader />;
       if (newsScreen === "bbcReader") return /*#__PURE__*/<BBCReader />;
       if (newsScreen === "bbcList") return /*#__PURE__*/<BBCList />;
+      if (newsScreen === "countryHub") return /*#__PURE__*/<NewsCountryHub />;
       return /*#__PURE__*/<NewsHub />;
     }
     if (navTab === "talk") return /*#__PURE__*/<Talk />;
@@ -2895,6 +2900,9 @@ function EigoMasterInner() {
       fontSize: 13,
       fontWeight: 600
     }}>{curArticle.title}</span>;
+    if (newsScreen === "countryHub") return /*#__PURE__*/<span className="jp" style={{
+      fontSize: 15
+    }}>海外生活ニュース</span>;
     if (newsScreen === "bbcList") return /*#__PURE__*/<span className="jp" style={{
       fontSize: 15
     }}>{newsSource === 'pagesix' ? '✨ Page Six' : '🗞️ BBC News'}</span>;
@@ -2917,7 +2925,7 @@ function EigoMasterInner() {
       return;
     }
     if (newsScreen === "bbcList") {
-      setNewsScreen("hub");
+      setNewsScreen(newsCountry === 'us' ? "hub" : "countryHub");
     }
   };
   const getHeaderTitle = () => {
@@ -2955,7 +2963,7 @@ function EigoMasterInner() {
     if (wsActive) return /*#__PURE__*/<span className="jp" style={{
       fontSize: 15
     }}>🎮 単語シューティング</span>;
-    if (isNews && newsScreen !== "hub") return newsTitle();
+    if (isNews) return newsTitle();
     if (navTab === "advice") return /*#__PURE__*/<span className="jp" style={{
       fontSize: 15
     }}>AIコーチ</span>;
@@ -2963,7 +2971,7 @@ function EigoMasterInner() {
         fontSize: 20
       }}>🎓</span>}{/*#__PURE__*/<span className="jp">English Base</span>}{streakStats.streak > 0 && /*#__PURE__*/<span className="streak-badge">🔥{/*#__PURE__*/<span className="streak-num">{streakStats.streak}</span>}日</span>}</>;
   };
-  const showBack = isVideo || isTest || isAnal || isGrammarHub || isStudyHub || wsActive || isNews && newsScreen !== "hub";
+  const showBack = isVideo || isTest || isAnal || isGrammarHub || isStudyHub || wsActive || isNews && newsScreen !== "countryHub";
   const handleBack = () => {
     if (wsActive) {
       setWsActive(false);
@@ -3089,7 +3097,7 @@ function EigoMasterInner() {
           return /*#__PURE__*/<button key={param?.id ?? __idx} className={"ni".concat(navTab === id ? " on" : "")} onClick={() => {
             setNavTab(id);
             setScreen("main");
-            if (id === "news") setNewsScreen("hub");
+            if (id === "news") setNewsScreen("countryHub");
           }}>{I({
               n,
               s: 20,

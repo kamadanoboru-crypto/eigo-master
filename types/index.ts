@@ -62,6 +62,9 @@ export interface NewsArticle {
   link: string;
   pubDate: string;
   category: string;
+  sourceLabel?: string;
+  sourceUrl?: string;
+  country?: string;
 }
 
 // ── AI API レスポンス ─────────────────────────────────────────

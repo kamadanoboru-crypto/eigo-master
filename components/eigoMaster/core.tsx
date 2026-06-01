@@ -1148,10 +1148,11 @@ const refreshJapaneseImagesIfNeeded = async function (captions) {
 // ① BBC RSS フィード取得（CORS proxy経由）
 const fetchBBCNews = async function () {
   let feed = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'world';
+  let country = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 'us';
   // API Route /api/news/bbc 経由（サーバー側でCORSを解決）
   // allorigins.win は本番不安定なためサーバープロキシに変更
   try {
-    const r = await fetch("/api/news/bbc?feed=".concat(encodeURIComponent(feed)), {
+    const r = await fetch("/api/news/bbc?feed=".concat(encodeURIComponent(feed), "&country=").concat(encodeURIComponent(country)), {
       signal: AbortSignal.timeout(10000)
     });
     if (!r.ok) throw new Error("BBC API error: ".concat(r.status));
