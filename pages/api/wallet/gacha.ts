@@ -72,15 +72,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
-  const prize = await drawGacha({ userId, lastRewardType });
-  const result = await addCoins(userId, prize.reward_value);
-
   const nextDaily = {
     ...daily,
     free_gacha_used: daily.free_gacha_used + (payWith === 'free' ? 1 : 0),
     extra_gacha_count: daily.extra_gacha_count + (payWith === 'ad' ? 1 : 0),
   };
-  await updateDailyReward(userId, nextDaily);
+  const dailyUpdated = await updateDailyReward(userId, nextDaily);
+  if (!dailyUpdated) {
+    return res.status(500).json({
+      ok: false,
+      message: 'ガチャ回数の更新に失敗しました。時間をおいて再度お試しください',
+      daily,
+      ...left,
+    });
+  }
+
+  const prize = await drawGacha({ userId, lastRewardType });
+  const result = await addCoins(userId, prize.reward_value);
 
   console.log(`[gacha] ${userId.slice(0, 8)} -> ${prize.reward_key}`);
   return res.status(200).json({
