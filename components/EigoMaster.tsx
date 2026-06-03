@@ -443,6 +443,16 @@ function EigoMasterInner() {
         const r = await fetch("/api/wallet?userId=".concat(encodeURIComponent(uid)));
         if (!r.ok) return;
         const w = await r.json();
+        console.log('[GACHA_WALLET_GET]', {
+          activeWalletUserId,
+          requestedUserId: activeWalletUserId,
+          walletUserId: w?.user_id ?? w?.userId,
+          freeLeft: w?.gacha_daily?.freeLeft,
+          adLeft: w?.gacha_daily?.adLeft,
+          dailyLeft: w?.gacha_daily?.dailyLeft,
+          hasUsedToday: (w?.gacha_daily?.freeLeft ?? 0) <= 0,
+          buildSha: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? process.env.NEXT_PUBLIC_COMMIT_SHA ?? 'local',
+        });
         setWallet(w);
         if (w.gacha_daily) {
           var _w_gacha_daily_freeLeft;
@@ -1998,6 +2008,16 @@ function EigoMasterInner() {
       const r = await fetch("/api/wallet?userId=".concat(encodeURIComponent(activeWalletUserId)));
       if (r.ok) {
         const w = await r.json();
+        console.log('[GACHA_WALLET_GET]', {
+          activeWalletUserId,
+          requestedUserId: activeWalletUserId,
+          walletUserId: w?.user_id ?? w?.userId,
+          freeLeft: w?.gacha_daily?.freeLeft,
+          adLeft: w?.gacha_daily?.adLeft,
+          dailyLeft: w?.gacha_daily?.dailyLeft,
+          hasUsedToday: (w?.gacha_daily?.freeLeft ?? 0) <= 0,
+          buildSha: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? process.env.NEXT_PUBLIC_COMMIT_SHA ?? 'local',
+        });
         setWallet(w);
         if (w.gacha_daily) {
           var _w_gacha_daily_freeLeft;
@@ -2203,6 +2223,18 @@ function EigoMasterInner() {
       t$('ガチャチケットがありません');
       return;
     }
+    console.log('[GACHA_CLICK]', {
+      payWith,
+      activeWalletUserId,
+      dailyGachaLeft,
+      adGachaLeft,
+      walletUserId: wallet?.user_id ?? wallet?.userId,
+      freeLeft: wallet?.gacha_daily?.freeLeft,
+      adLeft: wallet?.gacha_daily?.adLeft,
+      dailyLeft: wallet?.gacha_daily?.dailyLeft,
+      hasUsedToday: dailyGachaLeft <= 0,
+      buildSha: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? process.env.NEXT_PUBLIC_COMMIT_SHA ?? 'local',
+    });
     setGachaInFlight(true);
     try {
       const r = await fetch('/api/wallet/gacha', {
@@ -2217,6 +2249,18 @@ function EigoMasterInner() {
         })
       });
       const d = await r.json();
+      console.log('[GACHA_POST_RESULT]', {
+        payWith,
+        activeWalletUserId,
+        ok: d?.ok,
+        message: d?.message,
+        freeLeft: d?.freeLeft,
+        adLeft: d?.adLeft,
+        dailyLeft: d?.dailyLeft,
+        hasUsedToday: (d?.freeLeft ?? 0) <= 0,
+        daily: d?.daily,
+        buildSha: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? process.env.NEXT_PUBLIC_COMMIT_SHA ?? 'local',
+      });
       if (!d.ok) {
         setGachaInFlight(false);
         t$(d.message || 'ガチャに失敗しました');

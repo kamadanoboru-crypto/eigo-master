@@ -12,13 +12,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const wallet = await getWallet(userId);
     const daily = await getDailyReward(userId);
     const maxAdGacha = ECONOMY.MAX_EXTRA_GACHA_DAILY - ECONOMY.FREE_GACHA_DAILY;
+    const gachaDaily = {
+      freeLeft: Math.max(0, ECONOMY.FREE_GACHA_DAILY - daily.free_gacha_used),
+      adLeft: Math.max(0, maxAdGacha - daily.extra_gacha_count),
+      dailyLeft: Math.max(0, ECONOMY.MAX_EXTRA_GACHA_DAILY - daily.free_gacha_used - daily.extra_gacha_count),
+    };
+    console.log('[GACHA_API_WALLET_GET]', {
+      userId,
+      walletUserId: wallet.user_id,
+      freeLeft: gachaDaily.freeLeft,
+      adLeft: gachaDaily.adLeft,
+      dailyLeft: gachaDaily.dailyLeft,
+      hasUsedToday: gachaDaily.freeLeft <= 0,
+      daily,
+      buildSha: process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? 'local',
+      vercelEnv: process.env.VERCEL_ENV ?? 'local',
+      builtAt: process.env.NEXT_PUBLIC_BUILD_TIME ?? 'unknown',
+    });
     return res.status(200).json({
       ...wallet,
-      gacha_daily: {
-        freeLeft: Math.max(0, ECONOMY.FREE_GACHA_DAILY - daily.free_gacha_used),
-        adLeft: Math.max(0, maxAdGacha - daily.extra_gacha_count),
-        dailyLeft: Math.max(0, ECONOMY.MAX_EXTRA_GACHA_DAILY - daily.free_gacha_used - daily.extra_gacha_count),
-      },
+      gacha_daily: gachaDaily,
     });
   }
 

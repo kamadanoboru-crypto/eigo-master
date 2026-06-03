@@ -35,8 +35,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const daily = await getDailyReward(userId);
   const left = getGachaLeft(daily);
+  const debugBase = {
+    userId,
+    payWith,
+    freeLeft: left.freeLeft,
+    adLeft: left.adLeft,
+    dailyLeft: left.dailyLeft,
+    hasUsedToday: left.freeLeft <= 0,
+    daily,
+    buildSha: process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? 'local',
+    vercelEnv: process.env.VERCEL_ENV ?? 'local',
+    builtAt: process.env.NEXT_PUBLIC_BUILD_TIME ?? 'unknown',
+  };
+  console.log('[GACHA_API_POST_BEFORE]', debugBase);
 
   if (left.dailyLeft <= 0) {
+    console.log('[GACHA_API_POST_BLOCKED]', { ...debugBase, reason: 'daily_left_empty' });
     return res.status(400).json({
       ok: false,
       message: `本日のガチャ上限（${ECONOMY.MAX_EXTRA_GACHA_DAILY}回）に達しました`,
@@ -46,6 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (payWith === 'free' && left.freeLeft <= 0) {
+    console.log('[GACHA_API_POST_BLOCKED]', { ...debugBase, reason: 'free_used' });
     return res.status(400).json({
       ok: false,
       message: '本日の無料ガチャは使用済みです。追加は広告視聴で引けます',
@@ -55,6 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (payWith === 'ad' && left.adLeft <= 0) {
+    console.log('[GACHA_API_POST_BLOCKED]', { ...debugBase, reason: 'ad_left_empty' });
     return res.status(400).json({
       ok: false,
       message: '本日の広告ガチャ上限に達しました',
@@ -64,6 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (payWith !== 'free' && payWith !== 'ad') {
+    console.log('[GACHA_API_POST_BLOCKED]', { ...debugBase, reason: 'unsupported_payWith' });
     return res.status(400).json({
       ok: false,
       message: '追加ガチャは広告視聴で引けます',
@@ -79,6 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   };
   const dailyUpdated = await updateDailyReward(userId, nextDaily);
   if (!dailyUpdated) {
+    console.log('[GACHA_API_POST_BLOCKED]', { ...debugBase, reason: 'daily_update_failed' });
     return res.status(500).json({
       ok: false,
       message: 'ガチャ回数の更新に失敗しました。時間をおいて再度お試しください',
@@ -91,6 +109,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const result = await addCoins(userId, prize.reward_value);
 
   console.log(`[gacha] ${userId.slice(0, 8)} -> ${prize.reward_key}`);
+  console.log('[GACHA_API_POST_SUCCESS]', {
+    ...debugBase,
+    freeLeft: getGachaLeft(nextDaily).freeLeft,
+    adLeft: getGachaLeft(nextDaily).adLeft,
+    dailyLeft: getGachaLeft(nextDaily).dailyLeft,
+    hasUsedToday: getGachaLeft(nextDaily).freeLeft <= 0,
+    nextDaily,
+  });
   return res.status(200).json({
     ok: true,
     prize,
