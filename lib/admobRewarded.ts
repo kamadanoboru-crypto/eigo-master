@@ -86,6 +86,11 @@ export function getRewardedAdAvailability() {
   return { available: true, reason: 'android' as const };
 }
 
+export function isAndroidNativeRewardedAdEnvironment() {
+  if (typeof window === 'undefined') return false;
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+}
+
 function errorMessage(reason: RewardedAdFailureReason) {
   const messages: Record<RewardedAdFailureReason, string> = {
     enabled_env_false: 'AdMob is disabled: NEXT_PUBLIC_ADMOB_ENABLED=false',

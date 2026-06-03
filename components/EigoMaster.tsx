@@ -4,7 +4,7 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import { CoinCostLabel, ErrorBoundary } from "./common";
 import { CSS } from "./eigoMaster/styles";
 import { useEigoMasterViews } from "./eigoMaster/views";
-import { showRewardedAd } from "../lib/admobRewarded";
+import { isAndroidNativeRewardedAdEnvironment, showRewardedAd } from "../lib/admobRewarded";
 import { DEFAULT_THUMBNAIL, SB_URL_AUTH, SB_ANON_AUTH, REWARD_ADS_ENABLED, MAX_STUDY_CAPTIONS, getSupabaseAuthConfig, supabaseAuth, SB_URL, SB_KEY, SB_READY, sbFrom, getUserId, GLOBAL_VIDEOS, STATIC_CAPTION_OVERRIDES, AFF_CARDS, getAffCard, AFF, RAKUTEN_TOEIC_OFFICIAL_URL, RAKUTEN_TOEIC_OFFICIAL_IMAGE, WORDS, GRAMMAR, LISTENING, GACHA_PRIZES, COIN_COSTS, AI_LIMIT_MESSAGE, isAiLimitError, shuffle, shuffleQuestionOptions, getSourceType, fetchQuiz, genWord, genGrammar, fetchGrammarList, fetchGrammarSession, saveGrammarAttempt, genListening, formatPart5Sentence, getPart5Japanese, calcToeic, toeicConfidence, spLevel, affLevel, stars, I, fetchVideoInfo, buildTimedSentences, fetchTranscript, aiGenerateChunks, looksLikeLegacyChunkMeaning, refreshJapaneseImagesIfNeeded, fetchBBCNews, fetchPageSixNews, splitSentences, aiWordMeaning, aiTranslateSentence, aiTranslateAll, dbSaveVideo, dbLoadVideos, dbSaveCaptions, dbLoadCaptions } from "./eigoMaster/core";
 
 // ErrorBoundaryでラップしてデフォルトエクスポート
@@ -70,6 +70,7 @@ function EigoMasterInner() {
   const [rewPct, setRewPct] = useState<any>(0);
   const [rewCb, setRewCb] = useState<any>(null);
   const [rewStatus, setRewStatus] = useState<any>('idle');
+  const [rewardedAdsAvailable, setRewardedAdsAvailable] = useState<any>(false);
   const rewardAdInFlightRef = useRef(false);
   // points / gacha
   const [pts, setPts] = useState<any>(() => {
@@ -322,9 +323,13 @@ function EigoMasterInner() {
     if (tmr.current) clearTimeout(tmr.current);
     tmr.current = setTimeout(() => setToast(null), 2800);
   }, []);
+  useEffect(() => {
+    setRewardedAdsAvailable(isAndroidNativeRewardedAdEnvironment());
+  }, []);
   // ── Supabase: ユーザーID ────────────────────────────────────
   // user_id: ログイン済みは auth.uid, 未ログインはlocalStorage UUID
   const [userId] = useState<any>(() => getUserId());
+  const activeWalletUserId = (authUser === null || authUser === void 0 ? void 0 : authUser.id) || userId;
   // ── ウォレット state ─────────────────────────────────────────
   const [wallet, setWallet] = useState<any>(() => {
     try {
@@ -343,6 +348,7 @@ function EigoMasterInner() {
   const [unlockModal, setUnlockModal] = useState<any>(null);
   const [dailyGachaLeft, setDailyGachaLeft] = useState<any>(1);
   const [adGachaLeft, setAdGachaLeft] = useState<any>(6);
+  const [gachaInFlight, setGachaInFlight] = useState<any>(false);
   // ── SNS state ────────────────────────────────────────────────
   const [myProfile, setMyProfile] = useState<any>(null);
   const [rankingTab, setRankingTab] = useState<any>('points');
@@ -431,7 +437,7 @@ function EigoMasterInner() {
   // ── ウォレット初期化: ログイン時に残高と本日のガチャ残数を取得 ──
   useEffect(() => {
     if (!SB_READY) return;
-    const uid = (authUser === null || authUser === void 0 ? void 0 : authUser.id) || userId;
+    const uid = activeWalletUserId;
     const initWallet = async () => {
       try {
         const r = await fetch("/api/wallet?userId=".concat(encodeURIComponent(uid)));
@@ -451,7 +457,7 @@ function EigoMasterInner() {
     };
     initWallet();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authUser === null || authUser === void 0 ? void 0 : authUser.id]);
+  }, [activeWalletUserId]);
   // プロフィール初回ロード
   useEffect(() => {
     loadProfile().catch(() => {});
@@ -1831,6 +1837,9 @@ function EigoMasterInner() {
   };
   const openRew = async function (cb) {
     let reason = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 'ai';
+    if (!rewardedAdsAvailable) {
+      return;
+    }
     if (rewardAdInFlightRef.current) {
       t$('広告を表示中です。完了までお待ちください。', 'warn');
       return;
@@ -1986,7 +1995,7 @@ function EigoMasterInner() {
   }, [navTab, authUser === null || authUser === void 0 ? void 0 : authUser.id, userId]);
   const fetchWallet = async () => {
     try {
-      const r = await fetch("/api/wallet?userId=".concat(encodeURIComponent(userId)));
+      const r = await fetch("/api/wallet?userId=".concat(encodeURIComponent(activeWalletUserId)));
       if (r.ok) {
         const w = await r.json();
         setWallet(w);
@@ -2176,6 +2185,7 @@ function EigoMasterInner() {
   };
   const doGacha = async function () {
     let payWith = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : 'free';
+    if (gachaInFlight) return;
     // 残回数チェック
     if (payWith === 'free' && dailyGachaLeft <= 0) {
       t$('本日の無料ガチャは終了しました');
@@ -2193,6 +2203,7 @@ function EigoMasterInner() {
       t$('ガチャチケットがありません');
       return;
     }
+    setGachaInFlight(true);
     try {
       const r = await fetch('/api/wallet/gacha', {
         method: 'POST',
@@ -2200,13 +2211,14 @@ function EigoMasterInner() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          userId,
+          userId: activeWalletUserId,
           payWith,
           lastRewardType: lastGachaRewardType
         })
       });
       const d = await r.json();
       if (!d.ok) {
+        setGachaInFlight(false);
         t$(d.message || 'ガチャに失敗しました');
         return;
       }
@@ -2257,8 +2269,10 @@ function EigoMasterInner() {
         })
       }, ...h].slice(0, 15));
       t$("\uD83C\uDF8A ".concat(prize.text));
+      setGachaInFlight(false);
     } catch (e) {
       if (SB_READY) {
+        setGachaInFlight(false);
         t$('ガチャ処理に失敗しました。通信状態を確認してもう一度お試しください。', 'ng');
         return;
       }
@@ -2290,6 +2304,7 @@ function EigoMasterInner() {
         })
       }, ...h].slice(0, 15));
       t$("\uD83C\uDF8A ".concat(prize.text, "（オフライン）"));
+      setGachaInFlight(false);
     }
   };
   // ── url add（oEmbed + AI自動処理）──────────────────────────
@@ -2548,6 +2563,7 @@ function EigoMasterInner() {
     gHist,
     gRes,
     gachaSkillStock,
+    gachaInFlight,
     genGrammar,
     genListening,
     genWord,
@@ -2625,6 +2641,7 @@ function EigoMasterInner() {
     rewPct,
     rewShow,
     rewStatus,
+    rewardedAdsAvailable,
     saveGrammarAttempt,
     saveProfile,
     saved,

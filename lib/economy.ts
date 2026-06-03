@@ -279,20 +279,29 @@ export interface DailyReward {
   listening_free_used: number;
 }
 
+function normalizeDailyReward(row?: Partial<DailyReward> | null): DailyReward {
+  return {
+    free_gacha_used: Number(row?.free_gacha_used ?? 0) || 0,
+    extra_gacha_count: Number(row?.extra_gacha_count ?? 0) || 0,
+    quiz_free_used: Number(row?.quiz_free_used ?? 0) || 0,
+    listening_free_used: Number(row?.listening_free_used ?? 0) || 0,
+  };
+}
+
 export async function getDailyReward(userId: string): Promise<DailyReward> {
   const today = todayJst();
-  if (!READY) return { free_gacha_used: 0, extra_gacha_count: 0, quiz_free_used: 0, listening_free_used: 0 };
+  if (!READY) return normalizeDailyReward();
   const rows = await sbGet('daily_rewards', `user_id=eq.${encodeURIComponent(userId)}&reward_date=eq.${today}&limit=1`);
-  if (rows.length) return rows[0] as unknown as DailyReward;
-  return { free_gacha_used: 0, extra_gacha_count: 0, quiz_free_used: 0, listening_free_used: 0 };
+  if (rows.length) return normalizeDailyReward(rows[0] as unknown as Partial<DailyReward>);
+  return normalizeDailyReward();
 }
 
 export async function updateDailyReward(
   userId: string,
   patch: Partial<DailyReward>,
-): Promise<void> {
+): Promise<boolean> {
   const today = todayJst();
-  await sbUpsert('daily_rewards', { user_id: userId, reward_date: today, ...patch }, 'user_id,reward_date');
+  return sbUpsert('daily_rewards', { user_id: userId, reward_date: today, ...patch }, 'user_id,reward_date');
 }
 
 // ── ガチャ抽選（weight管理）──────────────────────────────────

@@ -94,6 +94,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     gHist,
     gRes,
     gachaSkillStock,
+    gachaInFlight,
     genGrammar,
     genListening,
     genWord,
@@ -170,6 +171,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     rewCb,
     rewPct,
     rewShow,
+    rewardedAdsAvailable,
     saveGrammarAttempt,
     saveProfile,
     saved,
@@ -823,12 +825,25 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
         }}>{/*#__PURE__*/<button className="bp" style={{
             flex: 1,
             fontSize: 13
-          }} onClick={() => doGacha('free')} disabled={dailyGachaLeft <= 0}>{dailyGachaLeft > 0 ? "\uD83C\uDFB0 今日の無料ガチャ" : "🎰 無料は明日"}</button>}{/*#__PURE__*/<button className="bp" style={{
+          }} onClick={() => doGacha('free')} disabled={gachaInFlight || dailyGachaLeft <= 0}>{dailyGachaLeft > 0 ? "\uD83C\uDFB0 今日の無料ガチャ" : "🎰 無料は明日"}</button>}{rewardedAdsAvailable ? /*#__PURE__*/<button className="bp" style={{
             flex: 1,
             fontSize: 12,
             background: adGachaLeft > 0 ? "linear-gradient(135deg,#5F4724,#183153)" : "var(--bd)",
             color: adGachaLeft > 0 ? "#fff" : "var(--t3)"
-          }} onClick={() => openRew(() => doGacha('ad'))} disabled={adGachaLeft <= 0}>{adGachaLeft > 0 ? "\uD83D\uDCFA CMを見てガチャ" : "\uD83D\uDCFA 本日は上限"}</button>}</div>}{wallet.coins < 5 && /*#__PURE__*/<div className="jp" style={{
+          }} onClick={() => openRew(() => doGacha('ad'), 'gacha')} disabled={gachaInFlight || adGachaLeft <= 0}>{adGachaLeft > 0 ? "\uD83D\uDCFA CMを見てガチャ" : "\uD83D\uDCFA 本日は上限"}</button> : /*#__PURE__*/<div className="jp" style={{
+            flex: 1,
+            minHeight: 44,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            fontSize: 12,
+            color: "var(--t2)",
+            background: "var(--sur)",
+            border: "1px solid var(--bd)",
+            borderRadius: "var(--rs)",
+            padding: "8px 10px"
+          }}>広告ガチャはAndroidアプリ版で利用できます</div>}</div>}{wallet.coins < 5 && /*#__PURE__*/<div className="jp" style={{
           fontSize: 12,
           color: "var(--t2)",
           textAlign: "center",
