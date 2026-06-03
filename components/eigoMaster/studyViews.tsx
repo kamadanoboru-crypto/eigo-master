@@ -273,6 +273,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
     setUnlockModal,
     setUrlIn,
     setUrlLd,
+    setVideoPage,
     setVideoVotes,
     setVideos,
     setWallet,
@@ -351,6 +352,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
     urlIn,
     urlLd,
     userId,
+    videoPage,
     videoVotes,
     videos,
     voteGrammarExplanation,
@@ -394,9 +396,19 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
     color: '#059669',
     url: process.env.NEXT_PUBLIC_AFFILIATE_ELSA_URL || 'https://elsaspeak.com/'
   };
+  const videoPageSize = 4;
+  React.useEffect(() => {
+    setVideoPage(0);
+  }, [homeTab, setVideoPage]);
+  React.useEffect(() => {
+    setVideoPage(p => Math.min(p, Math.max(0, Math.ceil(dVids.length / videoPageSize) - 1)));
+  }, [dVids.length, setVideoPage]);
   const Home = () => {
     const hasAiReady = dVids.some(v => captionCache[v.videoId] || STATIC_CAPTION_OVERRIDES[v.videoId]);
     const hasSaved = saved.length > 0;
+    const totalVideoPages = Math.max(1, Math.ceil(dVids.length / videoPageSize));
+    const safeVideoPage = Math.min(videoPage, totalVideoPages - 1);
+    const pageVids = dVids.slice(safeVideoPage * videoPageSize, safeVideoPage * videoPageSize + videoPageSize);
     return /*#__PURE__*/<div className="sa">{/*#__PURE__*/<div className="tabs">{[["all", "\u5171\u6709\u52d5\u753b"], ["my", "MY\u30ea\u30b9\u30c8"], ["review", "\u5fa9\u7fd2"], ["add", "\u8ffd\u52a0"]].map((param, __idx) => {
           let [k, v] = param;
           return /*#__PURE__*/<div key={param?.id ?? __idx} className={"tab ".concat(homeTab === k ? "on" : "")} onClick={() => setHomeTab(k)}>{v}</div>;
@@ -623,7 +635,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
           color: "var(--t2)",
           marginBottom: 16,
           lineHeight: 1.7
-        }}>動画を追加すると、ここに表示されます。</div>}</div> : /*#__PURE__*/<div className="vlist">{dVids.map((v, __idx) => {
+        }}>動画を追加すると、ここに表示されます。</div>}</div> : /*#__PURE__*/<div className="vlist">{pageVids.map((v, __idx) => {
           const thumbSrc = typeof v.thumbnail === 'string' && v.thumbnail.trim() ? v.thumbnail : DEFAULT_THUMBNAIL;
           return /*#__PURE__*/<button key={v?.id ?? __idx} className="vcard" onClick={() => goVideo(v)} aria-label={v.title}>{/*#__PURE__*/<div key={v?.id ?? __idx} className="vth">{/*#__PURE__*/<img key={v?.id ?? __idx} src={thumbSrc} alt="" onError={e => {
                 const img = e.currentTarget;
@@ -727,7 +739,23 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
                   background: "linear-gradient(90deg,var(--p),var(--a))",
                   transition: "width .4s ease"
                 }} />}</div>}</div>}</button>;
-        })}</div>)}{/*#__PURE__*/<SponsorCard />}{/*#__PURE__*/<div className="divhr" />}{/*#__PURE__*/<div style={{
+        })}{dVids.length > videoPageSize && /*#__PURE__*/<div className="jp" style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          padding: "4px 2px 2px"
+        }}>{/*#__PURE__*/<button className="bg" style={{
+            flex: 1,
+            fontSize: 12
+          }} disabled={safeVideoPage <= 0} onClick={() => setVideoPage(p => Math.max(0, p - 1))}>前へ</button>}{/*#__PURE__*/<span style={{
+            fontSize: 12,
+            color: "var(--t3)",
+            whiteSpace: "nowrap"
+          }}>{safeVideoPage * videoPageSize + 1}-{Math.min(dVids.length, safeVideoPage * videoPageSize + pageVids.length)} / {dVids.length}</span>}{/*#__PURE__*/<button className="bg" style={{
+            flex: 1,
+            fontSize: 12
+          }} disabled={safeVideoPage >= totalVideoPages - 1} onClick={() => setVideoPage(p => Math.min(totalVideoPages - 1, p + 1))}>次へ</button>}</div>}</div>)}{/*#__PURE__*/<SponsorCard />}{/*#__PURE__*/<div className="divhr" />}{/*#__PURE__*/<div style={{
         margin: "0 16px 8px",
         background: "linear-gradient(135deg,#FFF7ED,#FFEDD5)",
         borderRadius: "var(--r)",

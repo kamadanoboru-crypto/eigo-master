@@ -16,6 +16,7 @@ function EigoMasterInner() {
   const [navTab, setNavTab] = useState<any>("home");
   const [screen, setScreen] = useState<any>("main"); // main|video|wordTest|grammarTest|listeningTest|analysis
   const [homeTab, setHomeTab] = useState<any>("all");
+  const [videoPage, setVideoPage] = useState<any>(0);
   // video
   const [curVid, setCurVid] = useState<any>(null);
   const [capIdx, setCapIdx] = useState<any>(0);
@@ -1834,10 +1835,6 @@ function EigoMasterInner() {
       t$('広告を表示中です。完了までお待ちください。', 'warn');
       return;
     }
-    if (!sett.rewOn || !REWARD_ADS_ENABLED) {
-      t$('広告機能が無効です。Androidアプリで設定後に利用できます。', 'warn');
-      return;
-    }
     rewardAdInFlightRef.current = true;
     setRewCb(() => cb);
     setRewPct(10);
@@ -1858,8 +1855,9 @@ function EigoMasterInner() {
         setTimeout(() => setRewShow(false), 350);
         return;
       }
-      setRewStatus(result.error || '広告の読み込みに失敗しました');
-      t$(result.error || '広告の読み込みに失敗しました。時間をおいて再度お試しください', 'warn');
+      const detail = result.reason ? "".concat(result.reason, ": ").concat(result.error || '') : result.error || '広告の読み込みに失敗しました';
+      setRewStatus(detail);
+      t$(detail || '広告の読み込みに失敗しました。時間をおいて再度お試しください', 'warn');
       setTimeout(() => setRewShow(false), 700);
     } catch (e) {
       if (progressTimer) clearInterval(progressTimer);
@@ -2719,6 +2717,7 @@ function EigoMasterInner() {
     setShwWords,
     setStudyHubPages,
     setStudyVotes,
+    setVideoPage,
     setTAns,
     setTIdx,
     setTPh,
@@ -2809,6 +2808,7 @@ function EigoMasterInner() {
     urlIn,
     urlLd,
     userId,
+    videoPage,
     videoVotes,
     videos,
     voteGrammarExplanation,
@@ -2926,6 +2926,10 @@ function EigoMasterInner() {
     }
     if (newsScreen === "bbcList") {
       setNewsScreen(newsCountry === 'us' ? "hub" : "countryHub");
+      return;
+    }
+    if (newsScreen === "hub") {
+      setNewsScreen("countryHub");
     }
   };
   const getHeaderTitle = () => {
@@ -2979,7 +2983,7 @@ function EigoMasterInner() {
       setWsPhaseScreen('equip');
       return;
     }
-    if (isNews && newsScreen !== "hub") {
+    if (isNews && newsScreen !== "countryHub") {
       newsBack();
       return;
     }

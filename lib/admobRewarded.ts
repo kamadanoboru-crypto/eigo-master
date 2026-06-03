@@ -2,55 +2,126 @@ import { Capacitor } from '@capacitor/core';
 
 export type RewardedAdReason = 'gacha' | 'coin' | 'ai';
 
+export type RewardedAdFailureReason =
+  | 'enabled_env_false'
+  | 'enabled_env_missing'
+  | 'rewarded_id_missing'
+  | 'not_native'
+  | 'not_android'
+  | 'plugin_missing'
+  | 'already_showing'
+  | 'load_or_show_failed'
+  | 'browser';
+
 export type RewardedAdResult = {
   success: boolean;
   rewardEarned: boolean;
   error?: string;
+  reason?: RewardedAdFailureReason;
 };
+
+const TEST_REWARDED_AD_ID = 'ca-app-pub-3940256099942544/5224354917';
 
 let initialized = false;
 let showing = false;
 
-function getRewardedAdId() {
-  return process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID_ANDROID || '';
+function getEnabledEnv() {
+  return process.env.NEXT_PUBLIC_ADMOB_ENABLED;
 }
 
-function isEnabled() {
-  return process.env.NEXT_PUBLIC_ADMOB_ENABLED === 'true';
+function getRewardedAdIdEnv() {
+  return process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID_ANDROID;
+}
+
+function getRewardedAdId() {
+  return getRewardedAdIdEnv() || TEST_REWARDED_AD_ID;
+}
+
+function logAdMobDebug(context: string) {
+  const isNative = typeof window !== 'undefined' ? Capacitor.isNativePlatform() : false;
+  const platform = typeof window !== 'undefined' ? Capacitor.getPlatform() : 'server';
+  const enabledEnv = getEnabledEnv();
+  const rewardedIdEnv = getRewardedAdIdEnv();
+  const rewardedId = getRewardedAdId();
+
+  console.log('[AdMob rewarded debug]', {
+    context,
+    NEXT_PUBLIC_ADMOB_ENABLED: enabledEnv,
+    NEXT_PUBLIC_ADMOB_REWARDED_ID_ANDROID: rewardedIdEnv,
+    rewardedAdIdUsed: rewardedId,
+    usingTestFallback: !rewardedIdEnv,
+    isNativePlatform: isNative,
+    platform,
+  });
 }
 
 export function getRewardedAdAvailability() {
+  logAdMobDebug('availability');
+
   if (typeof window === 'undefined') {
     return { available: false, reason: 'browser' as const };
   }
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') {
-    return { available: false, reason: 'web' as const };
+
+  const isNative = Capacitor.isNativePlatform();
+  const platform = Capacitor.getPlatform();
+  if (!isNative) {
+    return { available: false, reason: 'not_native' as const };
   }
-  if (!isEnabled()) {
-    return { available: false, reason: 'disabled' as const };
+  if (platform !== 'android') {
+    return { available: false, reason: 'not_android' as const };
   }
-  if (!getRewardedAdId()) {
-    return { available: false, reason: 'missing-ad-id' as const };
+
+  const enabledEnv = getEnabledEnv();
+  if (enabledEnv === 'false') {
+    return { available: false, reason: 'enabled_env_false' as const };
   }
+
+  if (!enabledEnv) {
+    console.warn('[AdMob rewarded debug] NEXT_PUBLIC_ADMOB_ENABLED is missing; allowing Android test fallback.');
+  }
+  if (!getRewardedAdIdEnv()) {
+    console.warn('[AdMob rewarded debug] NEXT_PUBLIC_ADMOB_REWARDED_ID_ANDROID is missing; using Google test rewarded ad ID fallback.');
+  }
+
   return { available: true, reason: 'android' as const };
 }
 
+function errorMessage(reason: RewardedAdFailureReason) {
+  const messages: Record<RewardedAdFailureReason, string> = {
+    enabled_env_false: 'AdMob is disabled: NEXT_PUBLIC_ADMOB_ENABLED=false',
+    enabled_env_missing: 'AdMob enabled env is missing: NEXT_PUBLIC_ADMOB_ENABLED',
+    rewarded_id_missing: 'AdMob rewarded id is missing: NEXT_PUBLIC_ADMOB_REWARDED_ID_ANDROID',
+    not_native: 'AdMob is available only in the Android native app: not_native',
+    not_android: 'AdMob is available only on Android: not_android',
+    plugin_missing: 'AdMob plugin is missing or failed to load: plugin_missing',
+    already_showing: 'Rewarded ad is already showing: already_showing',
+    load_or_show_failed: 'Rewarded ad failed to load or show: load_or_show_failed',
+    browser: 'AdMob cannot run during server/browser rendering: browser',
+  };
+  return messages[reason];
+}
+
 export async function showRewardedAd(reason: RewardedAdReason): Promise<RewardedAdResult> {
+  logAdMobDebug(`show:${reason}`);
+
   const availability = getRewardedAdAvailability();
   if (!availability.available) {
-    const message =
-      availability.reason === 'web'
-        ? 'Web版ではこの機能はAndroidアプリで利用できます'
-        : availability.reason === 'disabled'
-          ? 'AdMobが無効です。NEXT_PUBLIC_ADMOB_ENABLED=true を設定してください'
-          : availability.reason === 'missing-ad-id'
-            ? 'AdMob広告IDが未設定です'
-            : 'AdMobはブラウザでは実行できません';
-    return { success: false, rewardEarned: false, error: message };
+    const failureReason = availability.reason as RewardedAdFailureReason;
+    return {
+      success: false,
+      rewardEarned: false,
+      reason: failureReason,
+      error: errorMessage(failureReason),
+    };
   }
 
   if (showing) {
-    return { success: false, rewardEarned: false, error: '広告を表示中です' };
+    return {
+      success: false,
+      rewardEarned: false,
+      reason: 'already_showing',
+      error: errorMessage('already_showing'),
+    };
   }
 
   showing = true;
@@ -58,7 +129,20 @@ export async function showRewardedAd(reason: RewardedAdReason): Promise<Rewarded
   let rewardEarned = false;
 
   try {
-    const { AdMob, RewardAdPluginEvents } = await import('@capacitor-community/admob');
+    let admobModule: typeof import('@capacitor-community/admob');
+    try {
+      admobModule = await import('@capacitor-community/admob');
+    } catch (error) {
+      console.error('[AdMob rewarded debug] plugin import failed', error);
+      return {
+        success: false,
+        rewardEarned: false,
+        reason: 'plugin_missing',
+        error: errorMessage('plugin_missing'),
+      };
+    }
+
+    const { AdMob, RewardAdPluginEvents } = admobModule;
 
     if (!initialized) {
       await AdMob.initialize({
@@ -73,8 +157,15 @@ export async function showRewardedAd(reason: RewardedAdReason): Promise<Rewarded
       }),
     );
 
+    const adId = getRewardedAdId();
+    console.log('[AdMob rewarded debug] prepareRewardVideoAd', {
+      adId,
+      reason,
+      usingTestFallback: !getRewardedAdIdEnv(),
+    });
+
     await AdMob.prepareRewardVideoAd({
-      adId: getRewardedAdId(),
+      adId,
       isTesting: true,
       immersiveMode: true,
       ssv: {
@@ -87,8 +178,14 @@ export async function showRewardedAd(reason: RewardedAdReason): Promise<Rewarded
 
     return { success: true, rewardEarned };
   } catch (error) {
-    const message = error instanceof Error ? error.message : '広告の読み込みに失敗しました';
-    return { success: false, rewardEarned: false, error: message };
+    console.error('[AdMob rewarded debug] load/show failed', error);
+    const message = error instanceof Error ? error.message : errorMessage('load_or_show_failed');
+    return {
+      success: false,
+      rewardEarned: false,
+      reason: 'load_or_show_failed',
+      error: `${errorMessage('load_or_show_failed')}: ${message}`,
+    };
   } finally {
     showing = false;
     await Promise.all(handles.map((handle) => handle.remove().catch(() => undefined)));
