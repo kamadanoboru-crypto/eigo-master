@@ -58,6 +58,8 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     capIdx,
     caps,
     captionCache,
+    captionLoading,
+    captionTimingLoading,
     captionsRef,
     chargeVideoGeneration,
     curArticle,
@@ -417,7 +419,24 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
         }}>{proc.step === 'transcript' ? '📡 字幕を取得中...' : proc.step === 'ai' ? '🤖 AIが日本語イメージを生成中...' : '💾 保存中...'}</div>}{/*#__PURE__*/<div style={{
           color: 'rgba(255,255,255,.7)',
           fontSize: 11
-        }}>{proc.pct}% 完了</div>}</div>}</div>}{!proc.active && !captionCache[curVid === null || curVid === void 0 ? void 0 : curVid.videoId] && !STATIC_CAPTION_OVERRIDES[curVid === null || curVid === void 0 ? void 0 : curVid.videoId] && /*#__PURE__*/<div style={{
+        }}>{proc.pct}% 完了</div>}</div>}</div>}{captionLoading && !proc.active && /*#__PURE__*/<div style={{
+      background: 'linear-gradient(135deg,#0B1F38,#183153)',
+      padding: '10px 16px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10
+    }}>{/*#__PURE__*/<div className="spin" style={{
+        borderColor: 'rgba(255,255,255,.4)',
+        borderTopColor: 'white'
+      }} />}{/*#__PURE__*/<div>{/*#__PURE__*/<div style={{
+          color: 'white',
+          fontSize: 13,
+          fontWeight: 600,
+          fontFamily: "'Noto Sans JP'"
+        }}>字幕を読み込んでいます...</div>}{/*#__PURE__*/<div style={{
+          color: 'rgba(255,255,255,.7)',
+          fontSize: 11
+        }}>翻訳字幕と時間情報を確認中です</div>}</div>}</div>}{!proc.active && !captionLoading && !captionCache[curVid === null || curVid === void 0 ? void 0 : curVid.videoId] && !STATIC_CAPTION_OVERRIDES[curVid === null || curVid === void 0 ? void 0 : curVid.videoId] && /*#__PURE__*/<div style={{
       background: 'var(--al)',
       padding: '10px 16px',
       display: 'flex',
@@ -470,7 +489,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
       }}>{/*#__PURE__*/<button type="button" className="cbtn cbtn-g" style={{
           fontSize: 11,
           padding: '6px 10px'
-        }} onClick={() => syncCaptionToCurrentTime(true)} disabled={!caps.length || !ytReaderReady}>現在位置に合わせる</button>}{/*#__PURE__*/<button type="button" className={"tog ".concat(autoSync ? "on" : "off")} onClick={() => setAutoSync(v => !v)} disabled={!caps.length || !ytReaderReady} aria-label="自動追従" title="自動追従" />}</div>}</div>}{curCap && /*#__PURE__*/<div className="cap-panel">{/*#__PURE__*/<div className="slbl">English</div>}{/*#__PURE__*/<div className="cap-en">{curCap.english}</div>}{/*#__PURE__*/<div className="slbl" style={{
+        }} onClick={() => syncCaptionToCurrentTime(true)} disabled={!caps.length || !ytReaderReady || captionTimingLoading}>{captionTimingLoading ? '時間情報を取得中...' : '現在位置に合わせる'}</button>}{/*#__PURE__*/<button type="button" className={"tog ".concat(autoSync ? "on" : "off")} onClick={() => setAutoSync(v => !v)} disabled={!caps.length || !ytReaderReady || captionTimingLoading} aria-label="自動追従" title="自動追従" />}</div>}</div>}{curCap && /*#__PURE__*/<div className="cap-panel">{/*#__PURE__*/<div className="slbl">English</div>}{/*#__PURE__*/<div className="cap-en">{curCap.english}</div>}{/*#__PURE__*/<div className="slbl" style={{
         marginTop: 12
       }}>日本語イメージ</div>}{/*#__PURE__*/<div style={{
         display: "flex",

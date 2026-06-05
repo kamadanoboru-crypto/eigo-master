@@ -157,6 +157,8 @@ function EigoMasterInner() {
   const [transLoading, setTransLoading] = useState<any>(false);
   // ── AI処理状態 ──
   const [captionCache, setCaptionCache] = useState<any>({}); // videoId → captions[]
+  const [captionLoading, setCaptionLoading] = useState<any>(false);
+  const [captionTimingLoading, setCaptionTimingLoading] = useState<any>(false);
   const [proc, setProc] = useState<any>({
     active: false,
     step: '',
@@ -1073,6 +1075,45 @@ function EigoMasterInner() {
   // 実際に取得・生成された字幕だけを表示する
   const caps = curVid ? captionCache[curVid.videoId] || STATIC_CAPTION_OVERRIDES[curVid.videoId] || [] : [];
   const curCap = caps[capIdx] || null;
+  const hasCaptionTiming = useCallback(list => Array.isArray(list) && list.some(c => Number((c === null || c === void 0 ? void 0 : c.start) || 0) > 0 || Number((c === null || c === void 0 ? void 0 : c.duration) || 0) > 0), []);
+  const addCaptionTiming = useCallback(async (videoId, list) => {
+    if (!videoId || !Array.isArray(list) || !list.length || hasCaptionTiming(list)) return list;
+    try {
+      const tr = await fetchTranscript(videoId);
+      const timing = Array.isArray(tr.timedSentences) ? tr.timedSentences : [];
+      if (tr.ok && timing.length) {
+        return list.map((c, i) => {
+          var _timing_i, _timing_i1;
+          var _timing_i_start, _timing_i_duration;
+          return {
+            ...c,
+            start: Number((_timing_i_start = (_timing_i = timing[i]) === null || _timing_i === void 0 ? void 0 : _timing_i.start) !== null && _timing_i_start !== void 0 ? _timing_i_start : 0),
+            duration: Number((_timing_i_duration = (_timing_i1 = timing[i]) === null || _timing_i1 === void 0 ? void 0 : _timing_i1.duration) !== null && _timing_i_duration !== void 0 ? _timing_i_duration : 0)
+          };
+        });
+      }
+    } catch (e) {}
+    return list;
+  }, [fetchTranscript, hasCaptionTiming]);
+  const ensureCurrentCaptionTiming = useCallback(async () => {
+    if (!(curVid === null || curVid === void 0 ? void 0 : curVid.videoId) || !caps.length) return null;
+    if (hasCaptionTiming(caps)) return caps;
+    setCaptionTimingLoading(true);
+    try {
+      const nextCaps = await addCaptionTiming(curVid.videoId, caps);
+      const ready = hasCaptionTiming(nextCaps);
+      if (ready) {
+        setCaptionCache(prev => ({
+          ...prev,
+          [curVid.videoId]: nextCaps
+        }));
+        dbSaveCaptions(curVid.videoId, nextCaps).catch(() => {});
+      }
+      return ready ? nextCaps : null;
+    } finally {
+      setCaptionTimingLoading(false);
+    }
+  }, [addCaptionTiming, caps, curVid, dbSaveCaptions, hasCaptionTiming]);
   const isSaved = id => saved.some(s => s.id === id);
   const toeic = calcToeic(TR);
   const spLv = spLevel(toeic);
@@ -1102,11 +1143,10 @@ function EigoMasterInner() {
       return Math.max(0, Math.min(Math.max(0, caps.length - 1), value));
     });
   }, [caps.length]);
-  const findCaptionIndexByTime = useCallback(seconds => {
-    const list = captionsRef.current || [];
+  const findCaptionIndexByTime = useCallback((seconds, sourceList) => {
+    const list = sourceList || captionsRef.current || [];
     if (!list.length) return -1;
-    const hasTiming = list.some(c => Number((c === null || c === void 0 ? void 0 : c.start) || 0) > 0 || Number((c === null || c === void 0 ? void 0 : c.duration) || 0) > 0);
-    if (!hasTiming) return -1;
+    if (!hasCaptionTiming(list)) return -1;
     let best = 0;
     for (let i = 0; i < list.length; i += 1) {
       var _list_i, _list_i1, _list_;
@@ -1117,23 +1157,32 @@ function EigoMasterInner() {
       if (start <= seconds + 0.35) best = i;
     }
     return best;
-  }, []);
-  const syncCaptionToCurrentTime = useCallback(function () {
+  }, [hasCaptionTiming]);
+  const syncCaptionToCurrentTime = useCallback(async function () {
     let showToast = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : false;
     const reader = ytReaderRef.current;
     if (!reader) {
       if (showToast) t$('YouTubeプレイヤーの準備中です');
       return;
     }
+    let listForSync = captionsRef.current || caps;
+    if (!hasCaptionTiming(listForSync)) {
+      const nextCaps = await ensureCurrentCaptionTiming();
+      if (!nextCaps) {
+        if (showToast) t$('字幕の時間情報を取得できませんでした。少し時間をおいて再度お試しください', 'warn');
+        return;
+      }
+      listForSync = nextCaps;
+    }
     const seconds = reader.getCurrentTime();
-    const nextIdx = findCaptionIndexByTime(seconds);
+    const nextIdx = findCaptionIndexByTime(seconds, listForSync);
     if (nextIdx < 0) {
-      if (showToast) t$('この字幕には時間情報がありません');
+      if (showToast) t$('現在位置に合う字幕が見つかりませんでした', 'warn');
       return;
     }
     setCapIdx(prev => prev === nextIdx ? prev : nextIdx);
     if (showToast) t$("現在位置 ".concat(Math.round(seconds), "秒 に合わせました"), 'ok');
-  }, [findCaptionIndexByTime, t$]);
+  }, [caps, ensureCurrentCaptionTiming, findCaptionIndexByTime, hasCaptionTiming, t$]);
   useEffect(() => {
     if (autoSyncTimerRef.current) {
       clearInterval(autoSyncTimerRef.current);
@@ -2444,26 +2493,7 @@ function EigoMasterInner() {
     setCapIdx(0);
     setShwPh("idle");
     setScreen("video");
-    const hasCaptionTiming = list => Array.isArray(list) && list.some(c => Number((c === null || c === void 0 ? void 0 : c.start) || 0) > 0 || Number((c === null || c === void 0 ? void 0 : c.duration) || 0) > 0);
-    const addTimingIfNeeded = async list => {
-      if (!Array.isArray(list) || !list.length || hasCaptionTiming(list)) return list;
-      try {
-        const tr = await fetchTranscript(v.videoId);
-        const timing = Array.isArray(tr.timedSentences) ? tr.timedSentences : [];
-        if (tr.ok && timing.length) {
-          return list.map((c, i) => {
-            var _timing_i, _timing_i1;
-            var _timing_i_start, _timing_i_duration;
-            return {
-              ...c,
-              start: Number((_timing_i_start = (_timing_i = timing[i]) === null || _timing_i === void 0 ? void 0 : _timing_i.start) !== null && _timing_i_start !== void 0 ? _timing_i_start : 0),
-              duration: Number((_timing_i_duration = (_timing_i1 = timing[i]) === null || _timing_i1 === void 0 ? void 0 : _timing_i1.duration) !== null && _timing_i_duration !== void 0 ? _timing_i_duration : 0)
-            };
-          });
-        }
-      } catch (e) {}
-      return list;
-    };
+    setCaptionLoading(true);
     const setReadyCaptions = captions => {
       setCaptionCache(prev => ({
         ...prev,
@@ -2474,32 +2504,36 @@ function EigoMasterInner() {
         aiReady: true
       } : vid));
     };
-    const cached = captionCache[v.videoId];
-    if (Array.isArray(cached) && cached.length > 0) {
-      const captions = await addTimingIfNeeded(cached);
-      setReadyCaptions(captions);
-      if (!hasCaptionTiming(cached) && hasCaptionTiming(captions)) {
-        dbSaveCaptions(v.videoId, captions).catch(() => {});
+    try {
+      const cached = captionCache[v.videoId];
+      if (Array.isArray(cached) && cached.length > 0) {
+        const captions = await addCaptionTiming(v.videoId, cached);
+        setReadyCaptions(captions);
+        if (!hasCaptionTiming(cached) && hasCaptionTiming(captions)) {
+          dbSaveCaptions(v.videoId, captions).catch(() => {});
+        }
+        return;
       }
-      return;
-    }
-    // Supabaseから読み込み
-    const fromDb = await dbLoadCaptions(v.videoId);
-    if (fromDb && fromDb.length > 0) {
-      const captions = await addTimingIfNeeded(fromDb);
-      setReadyCaptions(captions);
-      if (!hasCaptionTiming(fromDb) && hasCaptionTiming(captions)) {
-        dbSaveCaptions(v.videoId, captions).catch(() => {});
+      // Supabaseから読み込み
+      const fromDb = await dbLoadCaptions(v.videoId);
+      if (fromDb && fromDb.length > 0) {
+        const captions = await addCaptionTiming(v.videoId, fromDb);
+        setReadyCaptions(captions);
+        if (!hasCaptionTiming(fromDb) && hasCaptionTiming(captions)) {
+          dbSaveCaptions(v.videoId, captions).catch(() => {});
+        }
+        return;
       }
-      return;
-    }
-    // マイリストのchunksがあればそれを使う
-    if (v.chunks && v.chunks.length > 0) {
-      const captions = await addTimingIfNeeded(makeManualCaptions(v.chunks, v.videoId));
-      setReadyCaptions(captions);
-      if (hasCaptionTiming(captions)) {
-        dbSaveCaptions(v.videoId, captions).catch(() => {});
+      // マイリストのchunksがあればそれを使う
+      if (v.chunks && v.chunks.length > 0) {
+        const captions = await addCaptionTiming(v.videoId, makeManualCaptions(v.chunks, v.videoId));
+        setReadyCaptions(captions);
+        if (hasCaptionTiming(captions)) {
+          dbSaveCaptions(v.videoId, captions).catch(() => {});
+        }
       }
+    } finally {
+      setCaptionLoading(false);
     }
   };
   const voteSharedVideo = async (videoId, vote) => {
@@ -2637,6 +2671,8 @@ function EigoMasterInner() {
     capIdx,
     caps,
     captionCache,
+    captionLoading,
+    captionTimingLoading,
     captionsRef,
     chargeVideoGeneration,
     curArticle,
