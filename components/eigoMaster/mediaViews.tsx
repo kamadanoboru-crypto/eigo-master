@@ -5,6 +5,7 @@ import { CoinCostLabel } from "../common";
 import { YouTubeEmbed } from "../video/VideoPlayer";
 import type { EigoMasterViewDeps } from "./viewTypes";
 import { NEWS_COUNTRIES, NEWS_COUNTRY_ORDER } from "../../lib/newsCountries";
+import { AFFILIATE_LINKS } from "../../lib/affiliateLinks";
 export function useMediaViews(deps: EigoMasterViewDeps) {
   const {
     AFF,
@@ -556,9 +557,8 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
             })}</button>}</div>}{/*#__PURE__*/<button className="afcta" style={{
           background: afCard.color
         }} onClick={() => {
-          var _afCard_key;
-          logAffiliateClick((_afCard_key = afCard.key) !== null && _afCard_key !== void 0 ? _afCard_key : '', afCard.title, toeic);
-          if (afCard.url && afCard.url !== '#') window.open(afCard.url, '_blank', 'noopener');else t$('🔗 外部サービスへ（URL未設定 - lib/affiliateConfig.tsで設定）');
+          logAffiliateClick('study_sapuri', 'スタディサプリ ENGLISH', toeic);
+          window.open(AFFILIATE_LINKS.STUDY_SUPPLI_HOME, '_blank', 'noopener,noreferrer');
         }}>{afCard.cta}</button>}</div>}</div>}{/*#__PURE__*/<div style={{
       height: 20
     }} />}</div>;

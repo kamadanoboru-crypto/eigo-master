@@ -1080,21 +1080,52 @@ function EigoMasterInner() {
     if (!videoId || !Array.isArray(list) || !list.length || hasCaptionTiming(list)) return list;
     try {
       const tr = await fetchTranscript(videoId);
-      const timing = Array.isArray(tr.timedSentences) ? tr.timedSentences : [];
+      const timing = Array.isArray(tr.timedSentences) && tr.timedSentences.length ? tr.timedSentences : buildTimedSentences(tr.segments || []);
       if (tr.ok && timing.length) {
+        const normalizeTimingText = value => String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+        const timingScore = (a, b) => {
+          const left = normalizeTimingText(a);
+          const right = normalizeTimingText(b);
+          if (!left || !right) return 0;
+          if (left.includes(right) || right.includes(left)) return 1;
+          const leftWords = new Set(left.split(' ').filter(w => w.length > 2));
+          const rightWords = new Set(right.split(' ').filter(w => w.length > 2));
+          if (!leftWords.size || !rightWords.size) return 0;
+          let overlap = 0;
+          leftWords.forEach(word => {
+            if (rightWords.has(word)) overlap += 1;
+          });
+          return overlap / Math.min(leftWords.size, rightWords.size);
+        };
+        const pickTiming = (caption, index) => {
+          const captionText = caption === null || caption === void 0 ? void 0 : caption.english;
+          const direct = timing[index];
+          if (direct && Number(direct.duration || 0) > 0 && (!captionText || timingScore(captionText, direct.text) >= 0.28)) return direct;
+          let best = direct && Number(direct.duration || 0) > 0 ? direct : null;
+          let bestScore = best ? timingScore(captionText, best.text) : 0;
+          for (const item of timing) {
+            if (!item || Number(item.duration || 0) <= 0) continue;
+            const score = timingScore(captionText, item.text);
+            if (score > bestScore) {
+              best = item;
+              bestScore = score;
+            }
+          }
+          return bestScore >= 0.34 ? best : direct;
+        };
         return list.map((c, i) => {
-          var _timing_i, _timing_i1;
-          var _timing_i_start, _timing_i_duration;
+          var _matched_start, _matched_duration;
+          const matched = pickTiming(c, i);
           return {
             ...c,
-            start: Number((_timing_i_start = (_timing_i = timing[i]) === null || _timing_i === void 0 ? void 0 : _timing_i.start) !== null && _timing_i_start !== void 0 ? _timing_i_start : 0),
-            duration: Number((_timing_i_duration = (_timing_i1 = timing[i]) === null || _timing_i1 === void 0 ? void 0 : _timing_i1.duration) !== null && _timing_i_duration !== void 0 ? _timing_i_duration : 0)
+            start: Number((_matched_start = matched === null || matched === void 0 ? void 0 : matched.start) !== null && _matched_start !== void 0 ? _matched_start : 0),
+            duration: Number((_matched_duration = matched === null || matched === void 0 ? void 0 : matched.duration) !== null && _matched_duration !== void 0 ? _matched_duration : 0)
           };
         });
       }
     } catch (e) {}
     return list;
-  }, [fetchTranscript, hasCaptionTiming]);
+  }, [buildTimedSentences, fetchTranscript, hasCaptionTiming]);
   const ensureCurrentCaptionTiming = useCallback(async () => {
     if (!(curVid === null || curVid === void 0 ? void 0 : curVid.videoId) || !caps.length) return null;
     if (hasCaptionTiming(caps)) return caps;
