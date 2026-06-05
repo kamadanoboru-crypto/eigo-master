@@ -25,6 +25,7 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
     SB_URL_AUTH,
     STATIC_CAPTION_OVERRIDES,
     SponsorCard,
+    StudySapuriCard,
     TR,
     WORDS,
     adGachaLeft,
@@ -684,6 +685,7 @@ export function useSocialViews(deps: EigoMasterViewDeps) {
         <div className="sti"><span>テスト回数</span><strong>{totalSessions} 回</strong></div>
         <div className="stst">ウォレット</div>
         <div className="sti"><span>コイン</span><strong>{wallet.coins}</strong></div>
+        <StudySapuriCard screenName="settings" variant="home" compact />
         <button className="bg" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }} onClick={toggleHealth}>
           <span>接続状況</span>
           <span>{healthOpen ? '△' : '▽'}</span>

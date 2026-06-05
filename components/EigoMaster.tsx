@@ -5,6 +5,7 @@ import { CoinCostLabel, ErrorBoundary } from "./common";
 import { CSS } from "./eigoMaster/styles";
 import { useEigoMasterViews } from "./eigoMaster/views";
 import { isAndroidNativeRewardedAdEnvironment, showRewardedAd } from "../lib/admobRewarded";
+import { AFFILIATE_LINKS } from "../lib/affiliateLinks";
 import { DEFAULT_THUMBNAIL, SB_URL_AUTH, SB_ANON_AUTH, REWARD_ADS_ENABLED, MAX_STUDY_CAPTIONS, getSupabaseAuthConfig, supabaseAuth, SB_URL, SB_KEY, SB_READY, sbFrom, getUserId, GLOBAL_VIDEOS, STATIC_CAPTION_OVERRIDES, AFF_CARDS, getAffCard, AFF, RAKUTEN_TOEIC_OFFICIAL_URL, RAKUTEN_TOEIC_OFFICIAL_IMAGE, WORDS, GRAMMAR, LISTENING, GACHA_PRIZES, COIN_COSTS, AI_LIMIT_MESSAGE, isAiLimitError, shuffle, shuffleQuestionOptions, getSourceType, fetchQuiz, genWord, genGrammar, fetchGrammarList, fetchGrammarSession, saveGrammarAttempt, genListening, formatPart5Sentence, getPart5Japanese, calcToeic, toeicConfidence, spLevel, affLevel, stars, I, fetchVideoInfo, buildTimedSentences, fetchTranscript, aiGenerateChunks, looksLikeLegacyChunkMeaning, refreshJapaneseImagesIfNeeded, fetchBBCNews, fetchPageSixNews, splitSentences, aiWordMeaning, aiTranslateSentence, aiTranslateAll, dbSaveVideo, dbLoadVideos, dbSaveCaptions, dbLoadCaptions } from "./eigoMaster/core";
 
 // ErrorBoundaryでラップしてデフォルトエクスポート
@@ -1723,7 +1724,7 @@ function EigoMasterInner() {
   ;
   // ── reward ad ──
   // アフィリエイトクリックをログ送信（バックグラウンド・失敗してもOK）
-  const logAffiliateClick = (cardKey, cardTitle, toeicScore) => {
+  const logAffiliateClick = (cardKey, cardTitle, toeicScore, extra = {}) => {
     fetch('/api/affiliate/click', {
       method: 'POST',
       headers: {
@@ -1733,10 +1734,64 @@ function EigoMasterInner() {
         userId,
         cardKey,
         cardTitle,
-        toeicScore
+        toeicScore,
+        ...extra
       })
     }).catch(() => {});
   };
+  const openStudySapuriOffer = useCallback((screenName, url, label) => {
+    logAffiliateClick('study_sapuri', label, toeic, {
+      affiliateName: 'study_sapuri',
+      screenName
+    });
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, [toeic, userId]);
+  const StudySapuriCard = useCallback(function (props = {}) {
+    const {
+      screenName = 'home',
+      variant = 'home',
+      compact = false
+    } = props;
+    const isToeic = variant === 'toeic';
+    const isTrial = variant === 'trial';
+    const url = isTrial ? AFFILIATE_LINKS.STUDY_SUPPLI_TRIAL : isToeic ? AFFILIATE_LINKS.STUDY_SUPPLI_TOEIC : AFFILIATE_LINKS.STUDY_SUPPLI_HOME;
+    const cta = isTrial ? 'まずは無料体験' : isToeic ? 'TOEIC対策はこちら' : 'スタディサプリ ENGLISH';
+    const title = isTrial ? '学習継続おめでとうございます' : 'おすすめ教材';
+    const nextToeicTarget = toeic < 700 ? 700 : toeic < 800 ? 800 : 900;
+    const toeicGap = Math.max(0, nextToeicTarget - toeic);
+    const desc = isTrial ? '次のレベルへ進みませんか？' : isToeic ? "あと".concat(toeicGap, "点で").concat(nextToeicTarget, "点です。TOEIC対策をまとめて進められます。") : '毎日の英語学習に、TOEIC対策コースを組み合わせられます。';
+    return /*#__PURE__*/<div className="afcard" style={{
+      margin: compact ? "8px 0" : "8px 16px 12px",
+      borderColor: "#B8893233",
+      background: "#fff",
+      boxShadow: compact ? "none" : "var(--sh)"
+    }}>{/*#__PURE__*/<div style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 10
+      }}>{/*#__PURE__*/<div style={{
+          fontSize: 24,
+          lineHeight: 1
+        }}>🎓</div>}{/*#__PURE__*/<div style={{
+          flex: 1,
+          minWidth: 0
+        }}>{/*#__PURE__*/<div className="afbdg" style={{
+            background: "#B8893214",
+            color: "#8A5A18"
+          }}>{title}</div>}{/*#__PURE__*/<div className="jp" style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: "var(--t)",
+            marginBottom: 3
+          }}>スタディサプリ ENGLISH</div>}{/*#__PURE__*/<div className="jp" style={{
+            fontSize: 12,
+            color: "var(--t2)",
+            lineHeight: 1.55,
+            marginBottom: 10
+          }}>{desc}</div>}{/*#__PURE__*/<button className="afcta" style={{
+            background: "#B88932"
+          }} onClick={() => openStudySapuriOffer(screenName, url, cta)}>{cta}</button>}</div>}</div>}</div>;
+  }, [openStudySapuriOffer]);
   const openAffiliateOffer = useCallback(function () {
     let card = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : afCard;
     if (!card) return;
@@ -2541,6 +2596,7 @@ function EigoMasterInner() {
     SB_URL_AUTH,
     STATIC_CAPTION_OVERRIDES,
     SponsorCard,
+    StudySapuriCard,
     TR,
     WORDS,
     adGachaLeft,

@@ -276,6 +276,8 @@ create table if not exists affiliate_clicks (
   card_key     text not null,    -- 'basic' | 'toeic' | 'conversation'
   card_title   text,
   toeic_score  int,              -- クリック時のTOEIC予想スコア
+  affiliate_name text,
+  screen_name    text,
   clicked_at   timestamptz default now()
 );
 

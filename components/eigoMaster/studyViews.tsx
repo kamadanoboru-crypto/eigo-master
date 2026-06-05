@@ -27,6 +27,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
     SB_URL_AUTH,
     STATIC_CAPTION_OVERRIDES,
     SponsorCard,
+    StudySapuriCard,
     TR,
     WORDS,
     adGachaLeft,
@@ -598,7 +599,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
           }}>{streakStats.streak >= 7 ? "🏆 1週間継続！" : streakStats.streak >= 3 ? "👏 いい調子！" : "💪 今日も学習"}</div>}</div>}</div>}{hasAiReady && hasSaved && /*#__PURE__*/<button className="next-action" onClick={() => setNavTab('learn')} style={{
         margin: "12px 16px 0",
         width: "calc(100% - 32px)"
-      }}>{/*#__PURE__*/<span style={{
+        }}>{/*#__PURE__*/<span style={{
           fontSize: 22,
           flexShrink: 0
         }}>🎯</span>}{/*#__PURE__*/<div style={{
@@ -755,7 +756,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
           }}>{safeVideoPage * videoPageSize + 1}-{Math.min(dVids.length, safeVideoPage * videoPageSize + pageVids.length)} / {dVids.length}</span>}{/*#__PURE__*/<button className="bg" style={{
             flex: 1,
             fontSize: 12
-          }} disabled={safeVideoPage >= totalVideoPages - 1} onClick={() => setVideoPage(p => Math.min(totalVideoPages - 1, p + 1))}>次へ</button>}</div>}</div>)}{/*#__PURE__*/<SponsorCard />}{/*#__PURE__*/<div className="divhr" />}{/*#__PURE__*/<div style={{
+          }} disabled={safeVideoPage >= totalVideoPages - 1} onClick={() => setVideoPage(p => Math.min(totalVideoPages - 1, p + 1))}>次へ</button>}</div>}</div>)}{/*#__PURE__*/<StudySapuriCard screenName="home" variant="home" />}{[7, 30, 100].includes(streakStats.streak) && /*#__PURE__*/<StudySapuriCard screenName="streak" variant="trial" />}{/*#__PURE__*/<SponsorCard />}{/*#__PURE__*/<div className="divhr" />}{/*#__PURE__*/<div style={{
         margin: "0 16px 8px",
         background: "linear-gradient(135deg,#FFF7ED,#FFEDD5)",
         borderRadius: "var(--r)",
@@ -1902,7 +1903,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
             marginTop: 8,
             opacity: .7,
             fontFamily: "'Noto Sans JP'"
-          }}>テストを受けると精度が上がります</div>}</div>}{/*#__PURE__*/<div className="sc">{/*#__PURE__*/<div className="sc-t">{I({
+          }}>テストを受けると精度が上がります</div>}</div>}{/*#__PURE__*/<StudySapuriCard screenName="toeic" variant="toeic" compact />}{/*#__PURE__*/<div className="sc">{/*#__PURE__*/<div className="sc-t">{I({
               n: "chart",
               s: 15,
               c: "var(--p)"
