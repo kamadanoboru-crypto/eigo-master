@@ -23,6 +23,8 @@ create table if not exists video_captions (
   english       text not null,
   chunks        jsonb,
   meaning       jsonb,
+  start         numeric default 0,
+  duration      numeric default 0,
   created_at    timestamptz default now(),
   unique(video_id, caption_index)
 );
@@ -109,6 +111,7 @@ alter table quiz_cache     enable row level security;
 create policy "allow_all" on user_videos    for all using (true) with check (true);
 create policy "allow_r"   on video_captions for select using (true);
 create policy "allow_w"   on video_captions for insert using (true) with check (true);
+create policy "allow_u"   on video_captions for update using (true) with check (true);
 create policy "allow_all" on learning_logs  for all using (true) with check (true);
 create policy "allow_all" on saved_items    for all using (true) with check (true);
 create policy "allow_all" on my_playlist    for all using (true) with check (true);

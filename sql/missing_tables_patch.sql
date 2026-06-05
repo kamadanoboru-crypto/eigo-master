@@ -21,6 +21,8 @@ create table if not exists video_captions (
   english text not null,
   chunks jsonb,
   meaning jsonb,
+  start numeric default 0,
+  duration numeric default 0,
   created_at timestamptz default now(),
   unique(video_id, caption_index)
 );

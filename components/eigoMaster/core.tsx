@@ -1310,9 +1310,15 @@ const dbSaveCaptions = async (videoId, captions) => {
       caption_index: i,
       english: c.english,
       chunks: c.chunks,
-      meaning: c.meaning
+      meaning: c.meaning,
+      start: Number(c.start || 0),
+      duration: Number(c.duration || 0)
     }));
-    await sbFrom('video_captions').upsert(rows, 'video_id,caption_index');
+    const saved = await sbFrom('video_captions').upsert(rows, 'video_id,caption_index');
+    if (!saved) {
+      const legacyRows = rows.map(({ start, duration, ...row }) => row);
+      await sbFrom('video_captions').upsert(legacyRows, 'video_id,caption_index');
+    }
   } catch (e) {}
 };
 // ⑥ Supabase: 字幕を取得
@@ -1325,7 +1331,9 @@ const dbLoadCaptions = async videoId => {
       id: "".concat(videoId, "_").concat(i),
       english: r.english,
       chunks: r.chunks || [],
-      meaning: r.meaning || []
+      meaning: r.meaning || [],
+      start: Number(r.start || 0),
+      duration: Number(r.duration || 0)
     }));
   } catch (e) {
     return null;
