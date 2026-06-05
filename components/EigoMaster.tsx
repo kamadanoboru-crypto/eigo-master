@@ -2444,11 +2444,27 @@ function EigoMasterInner() {
     setCapIdx(0);
     setShwPh("idle");
     setScreen("video");
-    // メモリキャッシュ済みなら終了
-    if (captionCache[v.videoId]) return;
-    // マイリストのchunksがあればそれを使う
-    if (v.chunks && v.chunks.length > 0) {
-      const captions = makeManualCaptions(v.chunks, v.videoId);
+    const hasCaptionTiming = list => Array.isArray(list) && list.some(c => Number((c === null || c === void 0 ? void 0 : c.start) || 0) > 0 || Number((c === null || c === void 0 ? void 0 : c.duration) || 0) > 0);
+    const addTimingIfNeeded = async list => {
+      if (!Array.isArray(list) || !list.length || hasCaptionTiming(list)) return list;
+      try {
+        const tr = await fetchTranscript(v.videoId);
+        const timing = Array.isArray(tr.timedSentences) ? tr.timedSentences : [];
+        if (tr.ok && timing.length) {
+          return list.map((c, i) => {
+            var _timing_i, _timing_i1;
+            var _timing_i_start, _timing_i_duration;
+            return {
+              ...c,
+              start: Number((_timing_i_start = (_timing_i = timing[i]) === null || _timing_i === void 0 ? void 0 : _timing_i.start) !== null && _timing_i_start !== void 0 ? _timing_i_start : 0),
+              duration: Number((_timing_i_duration = (_timing_i1 = timing[i]) === null || _timing_i1 === void 0 ? void 0 : _timing_i1.duration) !== null && _timing_i_duration !== void 0 ? _timing_i_duration : 0)
+            };
+          });
+        }
+      } catch (e) {}
+      return list;
+    };
+    const setReadyCaptions = captions => {
       setCaptionCache(prev => ({
         ...prev,
         [v.videoId]: captions
@@ -2457,38 +2473,33 @@ function EigoMasterInner() {
         ...vid,
         aiReady: true
       } : vid));
+    };
+    const cached = captionCache[v.videoId];
+    if (Array.isArray(cached) && cached.length > 0) {
+      const captions = await addTimingIfNeeded(cached);
+      setReadyCaptions(captions);
+      if (!hasCaptionTiming(cached) && hasCaptionTiming(captions)) {
+        dbSaveCaptions(v.videoId, captions).catch(() => {});
+      }
       return;
     }
     // Supabaseから読み込み
     const fromDb = await dbLoadCaptions(v.videoId);
     if (fromDb && fromDb.length > 0) {
-      let captions = fromDb;
-      if (!fromDb.some(c => Number(c.duration) > 0)) {
-        try {
-          const tr = await fetchTranscript(v.videoId);
-          const timing = Array.isArray(tr.timedSentences) ? tr.timedSentences : [];
-          if (tr.ok && timing.length) {
-            captions = fromDb.map((c, i) => {
-              var _timing_i, _timing_i1;
-              var _timing_i_start, _timing_i_duration;
-              return {
-                ...c,
-                start: Number((_timing_i_start = (_timing_i = timing[i]) === null || _timing_i === void 0 ? void 0 : _timing_i.start) !== null && _timing_i_start !== void 0 ? _timing_i_start : 0),
-                duration: Number((_timing_i_duration = (_timing_i1 = timing[i]) === null || _timing_i1 === void 0 ? void 0 : _timing_i1.duration) !== null && _timing_i_duration !== void 0 ? _timing_i_duration : 0)
-              };
-            });
-          }
-        } catch (e) {}
+      const captions = await addTimingIfNeeded(fromDb);
+      setReadyCaptions(captions);
+      if (!hasCaptionTiming(fromDb) && hasCaptionTiming(captions)) {
+        dbSaveCaptions(v.videoId, captions).catch(() => {});
       }
-      setCaptionCache(prev => ({
-        ...prev,
-        [v.videoId]: captions
-      }));
-      // aiReadyバッジを更新
-      setVideos(prev => prev.map((vid, __idx) => vid.videoId === v.videoId ? {
-        ...vid,
-        aiReady: true
-      } : vid));
+      return;
+    }
+    // マイリストのchunksがあればそれを使う
+    if (v.chunks && v.chunks.length > 0) {
+      const captions = await addTimingIfNeeded(makeManualCaptions(v.chunks, v.videoId));
+      setReadyCaptions(captions);
+      if (hasCaptionTiming(captions)) {
+        dbSaveCaptions(v.videoId, captions).catch(() => {});
+      }
     }
   };
   const voteSharedVideo = async (videoId, vote) => {

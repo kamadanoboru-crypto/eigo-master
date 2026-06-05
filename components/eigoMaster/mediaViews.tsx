@@ -501,10 +501,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
       }}>{I({
           n: curCap && isSaved(curCap.id) ? "bkmkF" : "bkmk",
           s: 14
-        })}{curCap && isSaved(curCap.id) ? "保存済" : "保存"}</button>}{/*#__PURE__*/<button className="cbtn cbtn-sh" onClick={() => openAffiliateOffer(elsaCard)}>{I({
-          n: "mic",
-          s: 14
-        })} ELSAで発音練習</button>}{/*#__PURE__*/<button className="cbtn cbtn-g" style={{
+        })}{curCap && isSaved(curCap.id) ? "保存済" : "保存"}</button>}{/*#__PURE__*/<button className="cbtn cbtn-g" style={{
         marginLeft: "auto"
       }} onClick={toggleMyVideo}>{myList.some(v => v.videoId === (curVid === null || curVid === void 0 ? void 0 : curVid.videoId)) ? "".concat(String.fromCodePoint(0x1F4CC), " MY登録済み") : "".concat(String.fromCodePoint(0x1F4CC), " MY追加")}</button>}</div>}{affVis && sett.affOn && /*#__PURE__*/<div style={{
       paddingTop: 8
