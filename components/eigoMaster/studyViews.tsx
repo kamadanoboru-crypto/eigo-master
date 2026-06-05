@@ -756,7 +756,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
           }}>{safeVideoPage * videoPageSize + 1}-{Math.min(dVids.length, safeVideoPage * videoPageSize + pageVids.length)} / {dVids.length}</span>}{/*#__PURE__*/<button className="bg" style={{
             flex: 1,
             fontSize: 12
-          }} disabled={safeVideoPage >= totalVideoPages - 1} onClick={() => setVideoPage(p => Math.min(totalVideoPages - 1, p + 1))}>次へ</button>}</div>}</div>)}{/*#__PURE__*/<StudySapuriCard screenName="home" variant="home" />}{[7, 30, 100].includes(streakStats.streak) && /*#__PURE__*/<StudySapuriCard screenName="streak" variant="trial" />}{/*#__PURE__*/<SponsorCard />}{/*#__PURE__*/<div className="divhr" />}{/*#__PURE__*/<div style={{
+          }} disabled={safeVideoPage >= totalVideoPages - 1} onClick={() => setVideoPage(p => Math.min(totalVideoPages - 1, p + 1))}>次へ</button>}</div>}</div>)}{/*#__PURE__*/<StudySapuriCard screenName="home" variant="home" />}{[7, 30, 100].includes(streakStats.streak) && /*#__PURE__*/<StudySapuriCard screenName="streak" variant="trial" />}{/*#__PURE__*/<div className="divhr" />}{/*#__PURE__*/<div style={{
         margin: "0 16px 8px",
         background: "linear-gradient(135deg,#FFF7ED,#FFEDD5)",
         borderRadius: "var(--r)",
