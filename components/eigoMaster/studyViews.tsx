@@ -878,7 +878,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
       btext: "→",
       bcls: "lbn"
     }];
-    return /*#__PURE__*/<div className="sa">{/*#__PURE__*/<div className="lhub">{/*#__PURE__*/<div className="lsec">📺 動画</div>}{/*#__PURE__*/<button className="lcard" onClick={() => setNavTab("home")}>{/*#__PURE__*/<div className="lcard-ico" style={{
+    return /*#__PURE__*/<div className="sa">{/*#__PURE__*/<div className="lhub">{/*#__PURE__*/<div className="lsec">📺 動画</div>}{/*#__PURE__*/<button className="lcard" onClick={() => setScreen("videoLibrary")}>{/*#__PURE__*/<div className="lcard-ico" style={{
             background: "#F0F9FF"
           }}>{I({
               n: "vid",

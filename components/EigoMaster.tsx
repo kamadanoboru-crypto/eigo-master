@@ -4,6 +4,7 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import { CoinCostLabel, ErrorBoundary } from "./common";
 import { CSS } from "./eigoMaster/styles";
 import { useEigoMasterViews } from "./eigoMaster/views";
+import { HomeDashboard } from "./eigoMaster/HomeDashboard";
 import { isAndroidNativeRewardedAdEnvironment, showRewardedAd } from "../lib/admobRewarded";
 import { AFFILIATE_LINKS } from "../lib/affiliateLinks";
 import { DEFAULT_THUMBNAIL, SB_URL_AUTH, SB_ANON_AUTH, REWARD_ADS_ENABLED, MAX_STUDY_CAPTIONS, getSupabaseAuthConfig, supabaseAuth, SB_URL, SB_KEY, SB_READY, sbFrom, getUserId, GLOBAL_VIDEOS, STATIC_CAPTION_OVERRIDES, AFF_CARDS, getAffCard, AFF, RAKUTEN_TOEIC_OFFICIAL_URL, RAKUTEN_TOEIC_OFFICIAL_IMAGE, WORDS, GRAMMAR, LISTENING, GACHA_PRIZES, COIN_COSTS, AI_LIMIT_MESSAGE, isAiLimitError, shuffle, shuffleQuestionOptions, getSourceType, fetchQuiz, genWord, genGrammar, fetchGrammarList, fetchGrammarSession, saveGrammarAttempt, genListening, formatPart5Sentence, getPart5Japanese, calcToeic, toeicConfidence, spLevel, affLevel, stars, I, fetchVideoInfo, buildTimedSentences, fetchTranscript, aiGenerateChunks, looksLikeLegacyChunkMeaning, refreshJapaneseImagesIfNeeded, fetchBBCNews, fetchPageSixNews, splitSentences, aiWordMeaning, aiTranslateSentence, aiTranslateAll, dbSaveVideo, dbLoadVideos, dbSaveCaptions, dbLoadCaptions } from "./eigoMaster/core";
@@ -2628,7 +2629,7 @@ function EigoMasterInner() {
   // ════════════════════════════════════════════════════════════════
   // ── HOME ────────────────────────────────────────────────────────
   const {
-    Home,
+    Home: VideoLibrary,
     LearnHub,
     StudyHub,
     GrammarHub,
@@ -3040,11 +3041,12 @@ function EigoMasterInner() {
   });
   const isTest = ["wordTest", "grammarTest", "listeningTest"].includes(screen);
   const isVideo = screen === "video";
+  const isVideoLibrary = screen === "videoLibrary";
   const isAnal = screen === "analysis";
   const isGrammarHub = screen === "grammarHub";
   const isStudyHub = ["wordHub", "listeningHub", "shooterHub"].includes(screen);
   const isNews = navTab === "news";
-  const hideNav = isTest || isVideo || isAnal || isGrammarHub || isStudyHub;
+  const hideNav = isTest || isVideo || isVideoLibrary || isAnal || isGrammarHub || isStudyHub;
   const testName = {
     wordTest: "単語テスト",
     grammarTest: "文法 Part5",
@@ -3052,6 +3054,7 @@ function EigoMasterInner() {
   };
   const getContent = () => {
     if (isVideo) return VideoScreen();
+    if (isVideoLibrary) return /*#__PURE__*/<VideoLibrary />;
     if (isAnal) return /*#__PURE__*/<Analysis />;
     if (wsActive) return /*#__PURE__*/<WordShooter />;
     if (isGrammarHub) return /*#__PURE__*/<GrammarHub />;
@@ -3059,7 +3062,7 @@ function EigoMasterInner() {
     if (screen === "listeningHub") return /*#__PURE__*/<StudyHub kind="listening" />;
     if (screen === "shooterHub") return /*#__PURE__*/<StudyHub kind="shooter" />;
     if (isTest) return /*#__PURE__*/<Quiz />;
-    if (navTab === "home") return /*#__PURE__*/<Home />;
+    if (navTab === "home") return /*#__PURE__*/<HomeDashboard DEFAULT_THUMBNAIL={DEFAULT_THUMBNAIL} I={I} StudySapuriCard={StudySapuriCard} dVids={dVids} goVideo={goVideo} openGrammarHub={openGrammarHub} setNavTab={setNavTab} setScreen={setScreen} streakStats={streakStats} wallet={wallet} />;
     if (navTab === "learn") {
       if (wsActive) return /*#__PURE__*/<WordShooter />;
       return /*#__PURE__*/<LearnHub />;
@@ -3077,7 +3080,7 @@ function EigoMasterInner() {
     if (navTab === "gacha") return /*#__PURE__*/<Gacha />;
     if (navTab === "settings") return /*#__PURE__*/<Settings />;
     if (navTab === "saved") return /*#__PURE__*/<Saved />;
-    return /*#__PURE__*/<Home />;
+    return /*#__PURE__*/<HomeDashboard DEFAULT_THUMBNAIL={DEFAULT_THUMBNAIL} I={I} StudySapuriCard={StudySapuriCard} dVids={dVids} goVideo={goVideo} openGrammarHub={openGrammarHub} setNavTab={setNavTab} setScreen={setScreen} streakStats={streakStats} wallet={wallet} />;
   };
   // ニュース画面のヘッダータイトル
   const newsTitle = () => {
@@ -3141,6 +3144,9 @@ function EigoMasterInner() {
         whiteSpace: "nowrap",
         fontSize: 14
       }}>{curVid === null || curVid === void 0 ? void 0 : curVid.title}</span>}</>;
+    if (isVideoLibrary) return /*#__PURE__*/<span className="jp" style={{
+      fontSize: 15
+    }}>動画学習</span>;
     if (isGrammarHub) return /*#__PURE__*/<span className="jp" style={{
       fontSize: 15
     }}>文法 Part5</span>;
@@ -3170,7 +3176,7 @@ function EigoMasterInner() {
         fontSize: 20
       }}>🎓</span>}{/*#__PURE__*/<span className="jp">English Base</span>}{streakStats.streak > 0 && /*#__PURE__*/<span className="streak-badge">🔥{/*#__PURE__*/<span className="streak-num">{streakStats.streak}</span>}日</span>}</>;
   };
-  const showBack = isVideo || isTest || isAnal || isGrammarHub || isStudyHub || wsActive || isNews && newsScreen !== "countryHub";
+  const showBack = isVideo || isVideoLibrary || isTest || isAnal || isGrammarHub || isStudyHub || wsActive || isNews && newsScreen !== "countryHub";
   const handleBack = () => {
     if (wsActive) {
       setWsActive(false);
