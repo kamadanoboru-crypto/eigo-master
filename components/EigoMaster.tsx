@@ -3062,7 +3062,7 @@ function EigoMasterInner() {
     if (screen === "listeningHub") return /*#__PURE__*/<StudyHub kind="listening" />;
     if (screen === "shooterHub") return /*#__PURE__*/<StudyHub kind="shooter" />;
     if (isTest) return /*#__PURE__*/<Quiz />;
-    if (navTab === "home") return /*#__PURE__*/<HomeDashboard DEFAULT_THUMBNAIL={DEFAULT_THUMBNAIL} I={I} StudySapuriCard={StudySapuriCard} dVids={dVids} goVideo={goVideo} openGrammarHub={openGrammarHub} setNavTab={setNavTab} setScreen={setScreen} streakStats={streakStats} wallet={wallet} />;
+    if (navTab === "home") return /*#__PURE__*/<HomeDashboard DEFAULT_THUMBNAIL={DEFAULT_THUMBNAIL} I={I} StudySapuriCard={StudySapuriCard} dVids={dVids} goVideo={goVideo} loadRanking={loadRanking} openGrammarHub={openGrammarHub} setNavTab={setNavTab} setScreen={setScreen} setShowRanking={setShowRanking} streakStats={streakStats} wallet={wallet} />;
     if (navTab === "learn") {
       if (wsActive) return /*#__PURE__*/<WordShooter />;
       return /*#__PURE__*/<LearnHub />;
@@ -3080,7 +3080,7 @@ function EigoMasterInner() {
     if (navTab === "gacha") return /*#__PURE__*/<Gacha />;
     if (navTab === "settings") return /*#__PURE__*/<Settings />;
     if (navTab === "saved") return /*#__PURE__*/<Saved />;
-    return /*#__PURE__*/<HomeDashboard DEFAULT_THUMBNAIL={DEFAULT_THUMBNAIL} I={I} StudySapuriCard={StudySapuriCard} dVids={dVids} goVideo={goVideo} openGrammarHub={openGrammarHub} setNavTab={setNavTab} setScreen={setScreen} streakStats={streakStats} wallet={wallet} />;
+    return /*#__PURE__*/<HomeDashboard DEFAULT_THUMBNAIL={DEFAULT_THUMBNAIL} I={I} StudySapuriCard={StudySapuriCard} dVids={dVids} goVideo={goVideo} loadRanking={loadRanking} openGrammarHub={openGrammarHub} setNavTab={setNavTab} setScreen={setScreen} setShowRanking={setShowRanking} streakStats={streakStats} wallet={wallet} />;
   };
   // ニュース画面のヘッダータイトル
   const newsTitle = () => {

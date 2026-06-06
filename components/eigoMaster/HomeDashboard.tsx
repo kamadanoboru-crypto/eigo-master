@@ -8,9 +8,11 @@ export function HomeDashboard({
   StudySapuriCard,
   dVids,
   goVideo,
+  loadRanking,
   openGrammarHub,
   setNavTab,
   setScreen,
+  setShowRanking,
   streakStats,
   wallet
 }) {
@@ -51,7 +53,10 @@ export function HomeDashboard({
     desc: "学習の積み上げを確認",
     icon: "trophy",
     bg: "linear-gradient(135deg,#F59E0B,#D97706)",
-    onClick: () => setNavTab("talk")
+    onClick: () => {
+      loadRanking?.("points", "weekly");
+      setShowRanking?.(true);
+    }
   }];
 
   return (
