@@ -61,6 +61,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     captionCache,
     captionLoading,
     captionTimingLoading,
+    transcriptUnavailable,
     captionsRef,
     chargeVideoGeneration,
     curArticle,
@@ -437,7 +438,15 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
         }}>字幕を読み込んでいます...</div>}{/*#__PURE__*/<div style={{
           color: 'rgba(255,255,255,.7)',
           fontSize: 11
-        }}>翻訳字幕と時間情報を確認中です</div>}</div>}</div>}{!proc.active && !captionLoading && !captionCache[curVid === null || curVid === void 0 ? void 0 : curVid.videoId] && !STATIC_CAPTION_OVERRIDES[curVid === null || curVid === void 0 ? void 0 : curVid.videoId] && /*#__PURE__*/<div style={{
+        }}>翻訳字幕と時間情報を確認中です</div>}</div>}</div>}{(!proc.active || proc.step === 'manual') && !captionLoading && curVid && transcriptUnavailable?.[curVid.videoId] && !captionCache[curVid === null || curVid === void 0 ? void 0 : curVid.videoId] && !STATIC_CAPTION_OVERRIDES[curVid === null || curVid === void 0 ? void 0 : curVid.videoId] && /*#__PURE__*/<div style={{
+      background: '#FEF2F2',
+      borderTop: '1px solid #FECACA',
+      borderBottom: '1px solid #FECACA',
+      padding: '10px 16px',
+      color: '#991B1B',
+      fontSize: 12,
+      lineHeight: 1.6
+    }} className="jp"><strong>この動画はYouTubeから字幕情報を取得できない可能性があります。</strong><br />字幕本文が保存されていないため、生成を押しても再度失敗することがあります。コインは消費されません。</div>}{!proc.active && !captionLoading && !captionCache[curVid === null || curVid === void 0 ? void 0 : curVid.videoId] && !STATIC_CAPTION_OVERRIDES[curVid === null || curVid === void 0 ? void 0 : curVid.videoId] && /*#__PURE__*/<div style={{
       background: 'var(--al)',
       padding: '10px 16px',
       display: 'flex',

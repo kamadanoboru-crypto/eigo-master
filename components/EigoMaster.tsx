@@ -160,6 +160,14 @@ function EigoMasterInner() {
   const [captionCache, setCaptionCache] = useState<any>({}); // videoId → captions[]
   const [captionLoading, setCaptionLoading] = useState<any>(false);
   const [captionTimingLoading, setCaptionTimingLoading] = useState<any>(false);
+  const [transcriptUnavailable, setTranscriptUnavailable] = useState<any>(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('eb_transcript_unavailable') : '';
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  });
   const [proc, setProc] = useState<any>({
     active: false,
     step: '',
@@ -190,6 +198,30 @@ function EigoMasterInner() {
     } catch (e) {}
     t$(AI_LIMIT_MESSAGE, 'warn');
   }, [t$]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('eb_transcript_unavailable', JSON.stringify(transcriptUnavailable || {}));
+    } catch (e) {}
+  }, [transcriptUnavailable]);
+  const markTranscriptUnavailable = useCallback((videoId, reason) => {
+    if (!videoId) return;
+    setTranscriptUnavailable(prev => ({
+      ...(prev || {}),
+      [videoId]: {
+        reason: reason || 'YouTube transcript unavailable',
+        at: Date.now()
+      }
+    }));
+  }, []);
+  const clearTranscriptUnavailable = useCallback(videoId => {
+    if (!videoId) return;
+    setTranscriptUnavailable(prev => {
+      if (!prev || !prev[videoId]) return prev || {};
+      const next = { ...prev };
+      delete next[videoId];
+      return next;
+    });
+  }, []);
   const [manualText, setManualText] = useState<any>('');
   const [manualLoading, setManualLoading] = useState<any>(false);
   // test results (persistent)
@@ -800,6 +832,7 @@ function EigoMasterInner() {
           existing = await dbLoadCaptions(videoId);
         } catch (e) {}
         if (existing && existing.length > 0) {
+          clearTranscriptUnavailable(videoId);
           let withTiming = existing;
           if (!existing.some(c => Number(c.duration) > 0)) {
             try {
@@ -854,6 +887,7 @@ function EigoMasterInner() {
           };
         }
         if (res.ok && ((_res_sentences = res.sentences) === null || _res_sentences === void 0 ? void 0 : _res_sentences.length) > 0) {
+          clearTranscriptUnavailable(videoId);
           const timedSentences = Array.isArray(res.timedSentences) && res.timedSentences.length ? res.timedSentences : buildTimedSentences(res.segments || []);
           sentences = timedSentences.length ? timedSentences.map((item, __idx) => item.text) : res.sentences;
           timingMeta = timedSentences;
@@ -862,6 +896,7 @@ function EigoMasterInner() {
         } else {
           // 自動取得失敗 → 手動入力モーダルへ
           const reason = res.reason || '字幕が見つかりませんでした';
+          markTranscriptUnavailable(videoId, reason);
           console.log('[processNewVideo] 字幕取得失敗 → 手動入力モードへ:', reason);
           setProc(p => ({
             ...p,
@@ -2888,6 +2923,7 @@ function EigoMasterInner() {
     captionCache,
     captionLoading,
     captionTimingLoading,
+    transcriptUnavailable,
     captionsRef,
     chargeVideoGeneration,
     curArticle,
