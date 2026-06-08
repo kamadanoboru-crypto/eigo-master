@@ -500,9 +500,9 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
           display: "flex",
           alignItems: "center",
           gap: 5
-        }}>{/*#__PURE__*/<span key={m?.id ?? i} className="mng">{m}</span>}{i < arr.length - 1 && /*#__PURE__*/<span key={m?.id ?? i} className="csep">/</span>}</span>)}</div>}{looksLikeLegacyChunkMeaning(curCap) && /*#__PURE__*/<button className="cbtn cbtn-sh" style={{
+        }}>{/*#__PURE__*/<span key={m?.id ?? i} className="mng">{m}</span>}{i < arr.length - 1 && /*#__PURE__*/<span key={m?.id ?? i} className="csep">/</span>}</span>)}</div>}{caps.some(looksLikeLegacyChunkMeaning) && /*#__PURE__*/<button className="cbtn cbtn-sh" style={{
         marginTop: 10
-      }} disabled={jpRegenerating} onClick={regenerateCurrentJapanese}>{jpRegenerating ? '生成中...' : 'AIで日本語を生成'}</button>}</div>}{/*#__PURE__*/<div className="ctrlbar">        {/*#__PURE__*/<button className={"cbtn cbtn-s".concat(curCap && isSaved(curCap.id) ? " on" : "")} onClick={() => {
+      }} disabled={jpRegenerating} onClick={regenerateCurrentJapanese}>{jpRegenerating ? 'Generating...' : "Continue (".concat(COIN_COSTS.VIDEO_CONTINUE_TRANSLATION, ")")}</button>}</div>}{/*#__PURE__*/<div className="ctrlbar">        {/*#__PURE__*/<button className={"cbtn cbtn-s".concat(curCap && isSaved(curCap.id) ? " on" : "")} onClick={() => {
         if (!curCap) return;
         if (isSaved(curCap.id)) {
           setSaved(p => p.filter(s => s.id !== curCap.id));

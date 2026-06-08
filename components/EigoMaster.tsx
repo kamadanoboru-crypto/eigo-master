@@ -169,13 +169,15 @@ function EigoMasterInner() {
     needManual: false,
     errorMsg: ''
   });
-  const markTranslationApiLimited = useCallback(() => {
+  const markTranslationApiLimited = useCallback(function () {
+    let detail = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : AI_LIMIT_MESSAGE;
+    let source = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 'translation';
     setTranslationApiLimited(true);
     try {
       localStorage.setItem('eb_translation_api_limited', '1');
     } catch (e) {}
     t$(AI_LIMIT_MESSAGE, 'warn');
-  }, []);
+  }, [t$]);
   const [manualText, setManualText] = useState<any>('');
   const [manualLoading, setManualLoading] = useState<any>(false);
   // test results (persistent)
@@ -879,37 +881,14 @@ function EigoMasterInner() {
         return;
       }
       // STEP 2: AI 日本語イメージ生成
-      upd('ai', 20, {
-        needManual: false
-      });
-      let rawCaptions = [];
-      try {
-        rawCaptions = await aiGenerateChunks(sentences, pct => upd('ai', 20 + Math.round(pct * 0.65)));
-      } catch (e) {
-        console.error('[processNewVideo] AI Japanese image failed:', e.message);
-        if (isAiLimitError(e)) {
-          markTranslationApiLimited();
-          fail(AI_LIMIT_MESSAGE);
-          return;
-        }
-        // フォールバック: 文をそのまま使う
-        rawCaptions = sentences.map((s, __idx) => ({
-          english: s,
-          chunks: s.split(/\s+/).slice(0, 6),
-          meaning: ['(AI未接続)']
-        }));
-      }
-      if (rawCaptions.length === 0) {
-        fail('AI処理に失敗しました');
-        return;
-      }
-      // IDを付与
-      const captions = rawCaptions.map((c, i) => {
+      let captions = sentences.map((sentence, i) => {
         var _timingMeta_i, _timingMeta_i1;
         var _timingMeta_i_start, _timingMeta_i_duration;
         return {
-          ...c,
           id: "".concat(videoId, "_").concat(i),
+          english: sentence,
+          chunks: [],
+          meaning: [],
           start: Number((_timingMeta_i_start = (_timingMeta_i = timingMeta[i]) === null || _timingMeta_i === void 0 ? void 0 : _timingMeta_i.start) !== null && _timingMeta_i_start !== void 0 ? _timingMeta_i_start : 0),
           duration: Number((_timingMeta_i_duration = (_timingMeta_i1 = timingMeta[i]) === null || _timingMeta_i1 === void 0 ? void 0 : _timingMeta_i1.duration) !== null && _timingMeta_i_duration !== void 0 ? _timingMeta_i_duration : 0)
         };
@@ -921,6 +900,105 @@ function EigoMasterInner() {
           return;
         }
         t$("動画生成 -".concat(COIN_COSTS.VIDEO_GENERATION, "コイン"), 'info');
+      }
+      try {
+        await dbSaveCaptions(videoId, captions);
+        setCaptionCache(prev => ({
+          ...prev,
+          [videoId]: captions
+        }));
+        setVideos(prev => prev.map((v, __idx) => v.videoId === videoId ? {
+          ...v,
+          aiReady: true
+        } : v));
+      } catch (e) {
+        console.warn('[processNewVideo] English caption save failed:', e.message);
+      }
+      upd('ai', 20, {
+        needManual: false
+      });
+      let translatedCount = 0;
+      let aiLimited = false;
+      let aiLimitedDetail = '';
+      const batchSize = 6;
+      for (let i = 0; i < sentences.length; i += batchSize) {
+        const batch = sentences.slice(i, i + batchSize);
+        try {
+          const res = await fetch('/api/ai/chunk', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              sentences: batch,
+              source: 'video_initial_translation'
+            })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !Array.isArray(data.chunks)) {
+            const msg = (data === null || data === void 0 ? void 0 : data.error) || "HTTP ".concat(res.status);
+            if (res.status === 429 || res.status === 503 || isAiLimitError(msg)) {
+              aiLimited = true;
+              aiLimitedDetail = (data === null || data === void 0 ? void 0 : data.detail) || msg;
+              break;
+            }
+            throw new Error(msg);
+          }
+          captions = captions.map((caption, idx) => {
+            const localIndex = idx - i;
+            const next = data.chunks[localIndex];
+            if (localIndex < 0 || localIndex >= batch.length || !next) return caption;
+            const english = String(next.en || caption.english || '').trim();
+            const japanese = String(next.ja || '').trim();
+            if (!english || !japanese) return caption;
+            return {
+              ...caption,
+              english,
+              chunks: english.split(/\s+/).filter(Boolean).slice(0, 8),
+              meaning: [japanese]
+            };
+          });
+          translatedCount += data.chunks.filter(c => c === null || c === void 0 ? void 0 : c.ja).length;
+          await dbSaveCaptions(videoId, captions);
+          setCaptionCache(prev => ({
+            ...prev,
+            [videoId]: captions
+          }));
+          upd('ai', 20 + Math.round(Math.min(1, (i + batch.length) / sentences.length) * 65));
+          await new Promise(r => setTimeout(r, 1200));
+        } catch (e) {
+          console.error('[processNewVideo] AI Japanese image batch failed:', e.message);
+          if (isAiLimitError(e)) {
+            aiLimited = true;
+            aiLimitedDetail = e.message;
+            break;
+          }
+          captions = captions.map((caption, idx) => idx < i || idx >= i + batch.length ? caption : {
+            ...caption,
+            chunks: caption.english.split(/\s+/).filter(Boolean).slice(0, 6),
+            meaning: ['(AI pending)']
+          });
+          await dbSaveCaptions(videoId, captions);
+        }
+      }
+      if (aiLimited) {
+        markTranslationApiLimited(aiLimitedDetail || AI_LIMIT_MESSAGE, 'video_initial_translation');
+        if (SB_READY) {
+          await refundCoinsLocal(COIN_COSTS.VIDEO_PARTIAL_REFUND);
+          t$("Saved partial result. Refunded ".concat(COIN_COSTS.VIDEO_PARTIAL_REFUND, " coins"), 'warn');
+        } else {
+          t$('Saved partial result. Continue translation later.', 'warn');
+        }
+        setProc({
+          active: false,
+          step: 'done',
+          pct: Math.max(25, Math.round(translatedCount / Math.max(1, sentences.length) * 100)),
+          videoId: null,
+          videoTitle: '',
+          needManual: false,
+          errorMsg: ''
+        });
+        return;
       }
       // STEP 3: Supabase保存
       upd('saving', 88);
@@ -969,12 +1047,13 @@ function EigoMasterInner() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        text
+        text,
+        source: 'manual_transcript_translation'
       })
     });
     const data = await res.json();
     if (!res.ok || !Array.isArray(data.chunks)) {
-      if (res.status === 429 || res.status === 503 || isAiLimitError(data === null || data === void 0 ? void 0 : data.error)) throw new Error('AI_SYSTEM_LIMIT');
+      if (res.status === 429 || res.status === 503 || isAiLimitError(data === null || data === void 0 ? void 0 : data.error)) throw new Error((data === null || data === void 0 ? void 0 : data.detail) || 'AI_SYSTEM_LIMIT');
       throw new Error((data === null || data === void 0 ? void 0 : data.error) || 'chunk generation failed');
     }
     return data.chunks;
@@ -1002,7 +1081,7 @@ function EigoMasterInner() {
       } catch (err) {
         console.error('[manualChunk]', err);
         if (isAiLimitError(err)) {
-          markTranslationApiLimited();
+          markTranslationApiLimited(err, 'manual_transcript_translation');
           setManualLoading(false);
           setProc(p => ({
             ...p,
@@ -1237,33 +1316,116 @@ function EigoMasterInner() {
   }, [screen]);
   const regenerateCurrentJapanese = useCallback(async () => {
     if (!(curVid === null || curVid === void 0 ? void 0 : curVid.videoId) || !caps.length || jpRegenerating) return;
+    const targetIndexes = caps.map((caption, index) => looksLikeLegacyChunkMeaning(caption) ? index : -1).filter(index => index >= 0);
+    if (!targetIndexes.length) {
+      t$('No untranslated captions remain', 'ok');
+      return;
+    }
+    if (SB_READY && wallet.coins < COIN_COSTS.VIDEO_CONTINUE_TRANSLATION) {
+      t$("Continue translation needs ".concat(COIN_COSTS.VIDEO_CONTINUE_TRANSLATION, " coins"), 'warn');
+      return;
+    }
+    const spendForContinue = async () => {
+      if (!SB_READY) return true;
+      try {
+        const r = await fetch('/api/wallet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, action: 'spend', amount: COIN_COSTS.VIDEO_CONTINUE_TRANSLATION })
+        });
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+          t$((d === null || d === void 0 ? void 0 : d.message) || 'Coin payment failed', 'warn');
+          return false;
+        }
+        setWallet(w => ({ ...w, coins: d.remaining }));
+        return true;
+      } catch (e) {
+        t$('Coin payment failed', 'warn');
+        return false;
+      }
+    };
+    const refundContinue = async () => {
+      if (!SB_READY) return;
+      try {
+        const r = await fetch('/api/wallet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, action: 'refund', amount: COIN_COSTS.VIDEO_CONTINUE_PARTIAL_REFUND })
+        });
+        const d = await r.json();
+        if (r.ok && typeof d.total === 'number') setWallet(w => ({ ...w, coins: d.total }));
+      } catch (e) {}
+    };
+    const paid = await spendForContinue();
+    if (!paid) return;
+    t$("Continue translation -".concat(COIN_COSTS.VIDEO_CONTINUE_TRANSLATION, " coins"), 'info');
     setJpRegenerating(true);
     try {
-      const regenerated = await aiGenerateChunks(caps.map((c, __idx) => c.english).filter(Boolean), () => {});
-      const nextCaps = caps.map((caption, i) => {
-        var _next_meaning;
-        const next = regenerated[i];
-        if (!(next === null || next === void 0 ? void 0 : (_next_meaning = next.meaning) === null || _next_meaning === void 0 ? void 0 : _next_meaning.length)) return caption;
-        return {
-          ...caption,
-          chunks: [],
-          meaning: next.meaning
-        };
-      });
+      let nextCaps = caps;
+      let limited = false;
+      let limitedDetail = '';
+      const batchSize = 6;
+      for (let i = 0; i < targetIndexes.length; i += batchSize) {
+        const indexes = targetIndexes.slice(i, i + batchSize);
+        const batch = indexes.map(index => nextCaps[index].english).filter(Boolean);
+        if (!batch.length) continue;
+        const res = await fetch('/api/ai/chunk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sentences: batch, source: 'video_continue_translation' })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !Array.isArray(data.chunks)) {
+          const msg = (data === null || data === void 0 ? void 0 : data.error) || "HTTP ".concat(res.status);
+          if (res.status === 429 || res.status === 503 || isAiLimitError(msg)) {
+            limited = true;
+            limitedDetail = (data === null || data === void 0 ? void 0 : data.detail) || msg;
+            break;
+          }
+          throw new Error(msg);
+        }
+        nextCaps = nextCaps.map((caption, capIndex) => {
+          const localIndex = indexes.indexOf(capIndex);
+          const next = data.chunks[localIndex];
+          if (localIndex < 0 || !next) return caption;
+          const english = String(next.en || caption.english || '').trim();
+          const japanese = String(next.ja || '').trim();
+          if (!english || !japanese) return caption;
+          return {
+            ...caption,
+            english,
+            chunks: english.split(/\s+/).filter(Boolean).slice(0, 8),
+            meaning: [japanese]
+          };
+        });
+        setCaptionCache(prev => ({
+          ...prev,
+          [curVid.videoId]: nextCaps
+        }));
+        await dbSaveCaptions(curVid.videoId, nextCaps);
+        await new Promise(r => setTimeout(r, 1200));
+      }
+      if (limited) {
+        markTranslationApiLimited(limitedDetail || AI_LIMIT_MESSAGE, 'video_continue_translation');
+        await refundContinue();
+        t$("Saved partial result. Refunded ".concat(COIN_COSTS.VIDEO_CONTINUE_PARTIAL_REFUND, " coins"), 'warn');
+        return;
+      }
       setCaptionCache(prev => ({
         ...prev,
         [curVid.videoId]: nextCaps
       }));
       await dbSaveCaptions(curVid.videoId, nextCaps);
-      t$('日本語イメージを再生成しました', 'ok');
+      t$('Japanese meanings generated', 'ok');
     } catch (err) {
       console.error('[regenerateCurrentJapanese]', err);
-      t$('日本語イメージの再生成に失敗しました', 'ng');
+      await refundContinue();
+      t$("Generation failed. Refunded ".concat(COIN_COSTS.VIDEO_CONTINUE_PARTIAL_REFUND, " coins"), 'ng');
     } finally {
       setJpRegenerating(false);
     }
-  }, [curVid === null || curVid === void 0 ? void 0 : curVid.videoId, caps, jpRegenerating]);
-  // ── 学習ストリーク計算（TR から） ──────────────────────────
+  }, [curVid === null || curVid === void 0 ? void 0 : curVid.videoId, caps, jpRegenerating, wallet.coins, userId]);
   const streakStats = (() => {
     const allLogs = [...TR.word, ...TR.grammar, ...TR.listening, ...TR.shadowing].map((r, __idx) => (r.date || '').slice(0, 10)).filter(Boolean);
     const today = new Date().toISOString().slice(0, 10);

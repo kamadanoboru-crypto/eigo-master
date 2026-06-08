@@ -2,8 +2,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { callAI, parseJSON } from '../../../lib/aiClient';
 
 interface ChunkResponse { chunks: { en: string; ja: string }[]; }
-interface ChunkRequest { sentences?: string[]; text?: string; }
+interface ChunkRequest { sentences?: string[]; text?: string; source?: string; }
 const MAX_STUDY_CAPTIONS = 120;
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 type TranslationItem = {
   english?: string;
@@ -52,13 +54,47 @@ const isAiLimitError = (err: unknown) => /rate_limit|quota|429|RESOURCE_EXHAUSTE
   err instanceof Error ? err.message : String(err),
 );
 
+const maskSecrets = (value: unknown) =>
+  String(value instanceof Error ? value.message : value)
+    .replace(/sk-[A-Za-z0-9._-]+/g, 'sk-***')
+    .replace(/gsk_[A-Za-z0-9._-]+/g, 'gsk_***')
+    .replace(/AIza[A-Za-z0-9._-]+/g, 'AIza***');
+
+async function recordAiServiceStatus(source: string, err: unknown) {
+  if (!SB_URL || !SB_ANON) return;
+  const detail = maskSecrets(err).slice(0, 1000);
+  const status = isAiLimitError(err) ? 'limited' : 'error';
+  try {
+    await fetch(`${SB_URL}/rest/v1/ai_service_status?on_conflict=service`, {
+      method: 'POST',
+      headers: {
+        apikey: SB_ANON,
+        Authorization: `Bearer ${SB_ANON}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal,resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        service: 'translation',
+        status,
+        source,
+        message: status === 'limited' ? 'AI provider limit reached' : 'AI provider error',
+        detail,
+        provider_priority: process.env.AI_PROVIDER_PRIORITY || 'groq,cohere,gemini,openai',
+        occurred_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }),
+    });
+  } catch {}
+}
+
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<ChunkResponse | { error: string }>,
+  res: NextApiResponse<ChunkResponse | { error: string; detail?: string }>,
 ) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const sentences = normalizeSentences(req.body as ChunkRequest);
+  const source = String((req.body as ChunkRequest)?.source || 'ai_chunk').slice(0, 80);
   if (!sentences.length) return res.status(400).json({ error: 'sentences or text required' });
 
   const chunks: { en: string; ja: string }[] = [];
@@ -110,7 +146,11 @@ Rules:
     } catch (err) {
       console.error('[ai/chunk]', err instanceof Error ? err.message : err);
       if (isAiLimitError(err)) {
-        return res.status(429).json({ error: AI_LIMIT_MESSAGE });
+        await recordAiServiceStatus(source, err);
+        return res.status(429).json({
+          error: AI_LIMIT_MESSAGE,
+          detail: err instanceof Error ? err.message : String(err),
+        });
       }
       batch.forEach(s => chunks.push(fallbackSentence(s)));
     }

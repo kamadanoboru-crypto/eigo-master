@@ -19,7 +19,7 @@ function getPriority(): Provider[] {
 
 const MODELS: Partial<Record<Provider, string>> = {
   groq:   'llama-3.1-8b-instant',
-  cohere: 'command-r-plus',
+  cohere: 'command-r-08-2024',
   gemini: 'gemini-2.0-flash',
   openai: 'gpt-4o-mini',
 };
