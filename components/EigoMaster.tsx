@@ -169,6 +169,18 @@ function EigoMasterInner() {
     needManual: false,
     errorMsg: ''
   });
+  // toast: { msg, type:'ok'|'ng'|'warn'|'info' }
+  const [toast, setToast] = useState<any>(null);
+  const tmr = useRef(null);
+  const t$ = useCallback(function (m) {
+    let type = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 'info';
+    setToast({
+      msg: m,
+      type
+    });
+    if (tmr.current) clearTimeout(tmr.current);
+    tmr.current = setTimeout(() => setToast(null), 2800);
+  }, []);
   const markTranslationApiLimited = useCallback(function () {
     let detail = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : AI_LIMIT_MESSAGE;
     let source = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 'translation';
@@ -316,18 +328,6 @@ function EigoMasterInner() {
     };
     window.addEventListener('beforeinstallprompt', h);
     return () => window.removeEventListener('beforeinstallprompt', h);
-  }, []);
-  // toast: { msg, type:'ok'|'ng'|'warn'|'info' }
-  const [toast, setToast] = useState<any>(null);
-  const tmr = useRef(null);
-  const t$ = useCallback(function (m) {
-    let type = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : 'info';
-    setToast({
-      msg: m,
-      type
-    });
-    if (tmr.current) clearTimeout(tmr.current);
-    tmr.current = setTimeout(() => setToast(null), 2800);
   }, []);
   useEffect(() => {
     setRewardedAdsAvailable(isAndroidNativeRewardedAdEnvironment());
