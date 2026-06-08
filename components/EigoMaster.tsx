@@ -351,6 +351,10 @@ function EigoMasterInner() {
       daily_earned_coins: 0
     };
   });
+  const walletRef = useRef(wallet);
+  useEffect(() => {
+    walletRef.current = wallet;
+  }, [wallet]);
   const [unlockModal, setUnlockModal] = useState<any>(null);
   const [dailyGachaLeft, setDailyGachaLeft] = useState<any>(1);
   const [adGachaLeft, setAdGachaLeft] = useState<any>(6);
@@ -876,7 +880,7 @@ function EigoMasterInner() {
         fail('字幕テキストが空です');
         return;
       }
-      if (SB_READY && wallet.coins < COIN_COSTS.VIDEO_GENERATION) {
+      if (SB_READY && Number(walletRef.current?.coins || 0) < COIN_COSTS.VIDEO_GENERATION) {
         fail("動画生成には".concat(COIN_COSTS.VIDEO_GENERATION, "コイン必要です。"));
         return;
       }
@@ -1062,7 +1066,7 @@ function EigoMasterInner() {
     if (!manualText.trim() || !proc.videoId) return;
     const video = videos.find(v => v.videoId === proc.videoId);
     if (!video) return;
-    if (SB_READY && wallet.coins < COIN_COSTS.VIDEO_GENERATION) {
+    if (SB_READY && Number(walletRef.current?.coins || 0) < COIN_COSTS.VIDEO_GENERATION) {
       t$("動画生成には".concat(COIN_COSTS.VIDEO_GENERATION, "コイン必要です。"), 'warn');
       return;
     }
@@ -2366,8 +2370,9 @@ function EigoMasterInner() {
   };
   /** コイン消費 */
   const spendCoins = async amount => {
-    if (wallet.coins < amount) {
-      t$("コインが不足しています（必要: ".concat(amount, "枚、所持: ").concat(wallet.coins, "枚）"));
+    const currentCoins = Number(walletRef.current?.coins || 0);
+    if (currentCoins < amount) {
+      t$("コインが不足しています（必要: ".concat(amount, "枚、所持: ").concat(currentCoins, "枚）"));
       return false;
     }
     try {
@@ -2388,25 +2393,37 @@ function EigoMasterInner() {
           t$(d.message || 'コイン消費に失敗しました');
           return false;
         }
-        setWallet(w => ({
-          ...w,
-          coins: d.remaining
-        }));
+        setWallet(w => {
+          const next = {
+            ...w,
+            coins: d.remaining
+          };
+          walletRef.current = next;
+          return next;
+        });
         return true;
       }
     } catch (e) {}
     // フォールバック: ローカル消費
-    setWallet(w => ({
-      ...w,
-      coins: w.coins - amount
-    }));
+    setWallet(w => {
+      const next = {
+        ...w,
+        coins: w.coins - amount
+      };
+      walletRef.current = next;
+      return next;
+    });
     return true;
   };
   const refundCoinsLocal = async amount => {
-    setWallet(w => ({
-      ...w,
-      coins: w.coins + amount
-    }));
+    setWallet(w => {
+      const next = {
+        ...w,
+        coins: w.coins + amount
+      };
+      walletRef.current = next;
+      return next;
+    });
     if (!SB_READY) return;
     try {
       const r = await fetch('/api/wallet', {
@@ -2422,16 +2439,20 @@ function EigoMasterInner() {
       });
       if (r.ok) {
         const d = await r.json();
-        if (typeof d.total === 'number') setWallet(w => ({
-          ...w,
-          coins: d.total
-        }));
+        if (typeof d.total === 'number') setWallet(w => {
+          const next = {
+            ...w,
+            coins: d.total
+          };
+          walletRef.current = next;
+          return next;
+        });
       }
     } catch (e) {}
   };
   const chargeVideoGeneration = async () => {
     if (!SB_READY) return true;
-    if (wallet.coins < COIN_COSTS.VIDEO_GENERATION) {
+    if (Number(walletRef.current?.coins || 0) < COIN_COSTS.VIDEO_GENERATION) {
       t$("動画生成には".concat(COIN_COSTS.VIDEO_GENERATION, "コイン必要です。"), 'warn');
       return false;
     }
