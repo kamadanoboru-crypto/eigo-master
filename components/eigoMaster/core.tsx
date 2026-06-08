@@ -221,7 +221,9 @@ const getUserId = () => {
   try {
     let uid = localStorage.getItem("em_user_id");
     if (!uid) {
-      uid = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+      uid = typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
       localStorage.setItem("em_user_id", uid);
     }
     return uid;
