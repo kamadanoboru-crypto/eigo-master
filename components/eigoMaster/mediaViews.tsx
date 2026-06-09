@@ -78,6 +78,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     dbRemovePlaylist,
     dbSaveCaptions,
     dbSaveLine,
+    dbSaveWord,
     dbSaveTestResult,
     dbSaveVideo,
     deferredPrompt,
@@ -250,6 +251,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     setRewPct,
     setRewShow,
     setSaved,
+    setWordBook,
     setScreen,
     setSelSent,
     setSelWord,
@@ -369,6 +371,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     voteTranslation,
     wallet,
     wordData,
+    wordBook,
     wsActive,
     wsChoiceResult,
     wsChoices,
@@ -2426,6 +2429,25 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     }));
     if (data === null || data === void 0 ? void 0 : data.fromCache) t$('保存済みのAI回答を使いました', 'ok');else if (data === null || data === void 0 ? void 0 : data.cost) t$("AI単語確認 -".concat(data.cost, "コイン"), 'info');
     if (data === null || data === void 0 ? void 0 : data.error) t$(data.error, 'warn');
+    if ((data === null || data === void 0 ? void 0 : data.meaning) && !(data === null || data === void 0 ? void 0 : data.error)) {
+      const item = {
+        id: "word-".concat(clean.toLowerCase()),
+        word: clean,
+        meaning: data.meaning,
+        pos: data.pos || '',
+        example: data.example || '',
+        sentence,
+        savedAt: Date.now()
+      };
+      let shouldSave = false;
+      setWordBook(prev => {
+        const exists = (prev || []).some(w => String(w.word || '').toLowerCase() === clean.toLowerCase());
+        if (exists) return prev;
+        shouldSave = true;
+        return [item, ...(prev || [])];
+      });
+      if (shouldSave) dbSaveWord(item);
+    }
     setWordData(data);
     setTransLoading(false);
   };

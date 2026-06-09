@@ -94,6 +94,13 @@ function EigoMasterInner() {
   const [prPopup, setPrPopup] = useState<any>(false);
   const [prMemo, setPrMemo] = useState<any>('');
   const [prSaved, setPrSaved] = useState<any>([]); // [{id,type,word,meaning,memo,date}]
+  const [wordBook, setWordBook] = useState<any>(() => {
+    try {
+      const s = typeof window !== 'undefined' && localStorage.getItem('em_word_book');
+      if (s) return JSON.parse(s);
+    } catch (e) {}
+    return [];
+  });
   // Refs for sync scroll
   const prEnRef = typeof window !== 'undefined' ? {
     current: null
@@ -523,7 +530,7 @@ function EigoMasterInner() {
     const load = async () => {
       try {
         const uid = "user_id=eq.".concat(userId);
-        const [sLines, myL, tRes, uPts, uVids, captionRows, vVotes, allVideoVotes] = await Promise.all([sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.caption&order=saved_at.desc")), fetch("/api/list/get?userId=".concat(encodeURIComponent(userId))).then(r => r.json()), sbFrom("learning_logs").select("*&".concat(uid, "&order=created_at.asc")), sbFrom("user_points").select("*&".concat(uid)), sbFrom("user_videos").select("*&order=added_at.desc&limit=100"), sbFrom("video_captions").select("select=video_id&limit=1000"), sbFrom("video_votes").select("select=video_id,vote_type&user_id=eq.".concat(encodeURIComponent(userId), "&limit=1000")), sbFrom("video_votes").select("select=video_id,vote_type&limit=10000")]);
+        const [sLines, wLines, myL, tRes, uPts, uVids, captionRows, vVotes, allVideoVotes] = await Promise.all([sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.caption&order=saved_at.desc")), sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.word&order=saved_at.desc")), fetch("/api/list/get?userId=".concat(encodeURIComponent(userId))).then(r => r.json()), sbFrom("learning_logs").select("*&".concat(uid, "&order=created_at.asc")), sbFrom("user_points").select("*&".concat(uid)), sbFrom("user_videos").select("*&order=added_at.desc&limit=100"), sbFrom("video_captions").select("select=video_id&limit=1000"), sbFrom("video_votes").select("select=video_id,vote_type&user_id=eq.".concat(encodeURIComponent(userId), "&limit=1000")), sbFrom("video_votes").select("select=video_id,vote_type&limit=10000")]);
         // saved_items から保存済み文を復元（Phase3: 永続化）
         if (Array.isArray(sLines) && sLines.length > 0) {
           setSaved(sLines.map((r, __idx) => {
@@ -539,6 +546,27 @@ function EigoMasterInner() {
             };
           }).filter(r => r.english));
           console.log('[DB] saved_items 復元:', sLines.length, '件');
+        }
+        if (Array.isArray(wLines) && wLines.length > 0) {
+          const seenWords = new Set();
+          setWordBook(wLines.map((r, __idx) => {
+            const c = r.content || {};
+            const word = String(c.word || '').trim();
+            const key = word.toLowerCase();
+            if (!word || seenWords.has(key)) return null;
+            seenWords.add(key);
+            return {
+              id: c.id || r.id,
+              word,
+              meaning: c.meaning || '',
+              pos: c.pos || '',
+              example: c.example || '',
+              sentence: c.sentence || '',
+              savedAt: r.saved_at || Date.now(),
+              _dbId: r.id
+            };
+          }).filter(Boolean));
+          console.log('[DB] word_book restored:', wLines.length, 'items');
         }
         // my playlist
         if (Array.isArray(myL)) {
@@ -681,6 +709,11 @@ function EigoMasterInner() {
       localStorage.setItem('em_saved', JSON.stringify(saved));
     } catch (e) {}
   }, [saved]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('em_word_book', JSON.stringify(wordBook));
+    } catch (e) {}
+  }, [wordBook]);
   // ── pts を localStorage に同期 ─────────────────────────────
   useEffect(() => {
     try {
@@ -738,6 +771,36 @@ function EigoMasterInner() {
       console.log('[DB] saved_items 削除:', captionId);
     } catch (e) {
       console.error('[DB] saved_items 削除失敗:', e.message);
+    }
+  };
+  const dbSaveWord = async item => {
+    if (!SB_READY || !item?.word) return;
+    try {
+      await sbFrom("saved_items").insert({
+        user_id: userId,
+        item_type: 'word',
+        content: {
+          id: item.id,
+          word: item.word,
+          meaning: item.meaning || '',
+          pos: item.pos || '',
+          example: item.example || '',
+          sentence: item.sentence || ''
+        },
+        saved_at: item.savedAt || Date.now()
+      });
+      console.log('[DB] word_book saved:', item.word);
+    } catch (e) {
+      console.error('[DB] word_book save failed:', e.message);
+    }
+  };
+  const dbDeleteWord = async word => {
+    if (!SB_READY || !word) return;
+    try {
+      await sbFrom("saved_items").delete("user_id=eq.".concat(userId, "&content->>word=eq.").concat(encodeURIComponent(word), "&item_type=eq.word"));
+      console.log('[DB] word_book deleted:', word);
+    } catch (e) {
+      console.error('[DB] word_book delete failed:', e.message);
     }
   };
   const dbAddPlaylist = async video => {
@@ -2933,6 +2996,7 @@ function EigoMasterInner() {
     dailyGachaLeft,
     dbAddPlaylist,
     dbDeleteLine,
+    dbDeleteWord,
     dbLoadCaptions,
     dbLoadVideos,
     dbLoading,
@@ -2940,6 +3004,7 @@ function EigoMasterInner() {
     dbRemovePlaylist,
     dbSaveCaptions,
     dbSaveLine,
+    dbSaveWord,
     dbSaveTestResult,
     dbSaveVideo,
     deferredPrompt,
@@ -3113,6 +3178,7 @@ function EigoMasterInner() {
     setRewPct,
     setRewShow,
     setSaved,
+    setWordBook,
     setScreen,
     setSelSent,
     setSelWord,
@@ -3233,6 +3299,7 @@ function EigoMasterInner() {
     voteTranslation,
     wallet,
     wordData,
+    wordBook,
     wsActive,
     wsChoiceResult,
     wsChoices,
@@ -3258,14 +3325,16 @@ function EigoMasterInner() {
     ytReaderReady,
     ytReaderRef
   });
+  const WordBook = () => /*#__PURE__*/<div className="sa">{wordBook.length === 0 ? /*#__PURE__*/<div className="empty">{/*#__PURE__*/<div style={{ fontSize: 44, marginBottom: 10 }}>📒</div>}{/*#__PURE__*/<div className="jp" style={{ fontSize: 15, fontWeight: 700, color: "var(--t)" }}>単語帳はまだ空です</div>}{/*#__PURE__*/<div className="jp" style={{ fontSize: 12, color: "var(--t2)", marginTop: 6, lineHeight: 1.7 }}>ニュースで単語をタップすると、意味を確認した単語がここに保存されます。</div>}</div> : /*#__PURE__*/<div className="slist">{/*#__PURE__*/<div className="jp" style={{ fontSize: 13, color: "var(--t3)", padding: "2px 2px 6px" }}>{wordBook.length}語保存済み</div>}{wordBook.map((item, __idx) => /*#__PURE__*/<div key={(item?.word || __idx)} className="scard" style={{ display: "block" }}>{/*#__PURE__*/<div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>{/*#__PURE__*/<div style={{ minWidth: 0 }}>{/*#__PURE__*/<div style={{ fontSize: 20, fontWeight: 800, color: "var(--t)" }}>{item.word}</div>}{item.pos && /*#__PURE__*/<div style={{ fontSize: 11, color: "var(--t3)", fontStyle: "italic", marginTop: 1 }}>{item.pos}</div>}</div>}{/*#__PURE__*/<button className="bg" style={{ padding: "6px 9px", fontSize: 11, flexShrink: 0 }} onClick={() => { setWordBook(list => (list || []).filter(w => String(w.word || '').toLowerCase() !== String(item.word || '').toLowerCase())); dbDeleteWord(item.word); }}>削除</button>}</div>}{/*#__PURE__*/<div className="jp" style={{ fontSize: 14, color: "#92400E", fontWeight: 700, marginTop: 8 }}>{item.meaning}</div>}{item.example && /*#__PURE__*/<div style={{ fontSize: 12, color: "var(--t2)", borderTop: "1px solid var(--bd)", marginTop: 9, paddingTop: 8, fontStyle: "italic" }}>例: {item.example}</div>}{item.sentence && /*#__PURE__*/<div className="jp" style={{ fontSize: 11, color: "var(--t3)", marginTop: 7, lineHeight: 1.6 }}>{item.sentence}</div>}</div>)}{/*#__PURE__*/<button className="bp" style={{ marginTop: 8, width: "100%" }} onClick={() => setScreen("wordHub")}>単語テストへ</button>}</div>}</div>;
   const isTest = ["wordTest", "grammarTest", "listeningTest"].includes(screen);
   const isVideo = screen === "video";
   const isVideoLibrary = screen === "videoLibrary";
   const isAnal = screen === "analysis";
   const isGrammarHub = screen === "grammarHub";
   const isStudyHub = ["wordHub", "listeningHub", "shooterHub"].includes(screen);
+  const isWordBook = screen === "wordBook";
   const isNews = navTab === "news";
-  const hideNav = isTest || isVideo || isVideoLibrary || isAnal || isGrammarHub || isStudyHub;
+  const hideNav = isTest || isVideo || isVideoLibrary || isAnal || isGrammarHub || isStudyHub || isWordBook;
   const testName = {
     wordTest: "単語テスト",
     grammarTest: "文法 Part5",
@@ -3275,6 +3344,7 @@ function EigoMasterInner() {
     if (isVideo) return VideoScreen();
     if (isVideoLibrary) return /*#__PURE__*/<VideoLibrary />;
     if (isAnal) return /*#__PURE__*/<Analysis />;
+    if (isWordBook) return /*#__PURE__*/<WordBook />;
     if (wsActive) return /*#__PURE__*/<WordShooter />;
     if (isGrammarHub) return /*#__PURE__*/<GrammarHub />;
     if (screen === "wordHub") return /*#__PURE__*/<StudyHub kind="word" />;
@@ -3369,6 +3439,9 @@ function EigoMasterInner() {
     if (isGrammarHub) return /*#__PURE__*/<span className="jp" style={{
       fontSize: 15
     }}>文法 Part5</span>;
+    if (isWordBook) return /*#__PURE__*/<span className="jp" style={{
+      fontSize: 15
+    }}>単語帳</span>;
     if (screen === "wordHub") return /*#__PURE__*/<span className="jp" style={{
       fontSize: 15
     }}>単語テスト</span>;
@@ -3395,7 +3468,7 @@ function EigoMasterInner() {
         fontSize: 20
       }}>🎓</span>}{/*#__PURE__*/<span className="jp">English Base</span>}{streakStats.streak > 0 && /*#__PURE__*/<span className="streak-badge">🔥{/*#__PURE__*/<span className="streak-num">{streakStats.streak}</span>}日</span>}</>;
   };
-  const showBack = isVideo || isVideoLibrary || isTest || isAnal || isGrammarHub || isStudyHub || wsActive || isNews && newsScreen !== "countryHub";
+  const showBack = isVideo || isVideoLibrary || isTest || isAnal || isGrammarHub || isStudyHub || isWordBook || wsActive || isNews && newsScreen !== "countryHub";
   const handleBack = () => {
     if (wsActive) {
       setWsActive(false);

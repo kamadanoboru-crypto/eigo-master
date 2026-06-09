@@ -173,6 +173,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
     saveGrammarAttempt,
     saveProfile,
     saved,
+    wordBook,
     sbFrom,
     screen,
     selSent,
@@ -890,7 +891,13 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
             n: "chR",
             s: 18,
             c: "var(--t3)"
-          })}</button>}{/*#__PURE__*/<div className="lsec" style={{
+          })}</button>}{/*#__PURE__*/<button className="lcard" onClick={() => setScreen("wordBook")}>{/*#__PURE__*/<div className="lcard-ico" style={{
+            background: "#FFFBEB"
+          }}>📒</div>}{/*#__PURE__*/<div style={{
+            flex: 1,
+            minWidth: 0,
+            paddingRight: 64
+          }}>{/*#__PURE__*/<div className="lcard-t">単語帳</div>}{/*#__PURE__*/<div className="lcard-d">確認した単語の意味を復習</div>}</div>}{/*#__PURE__*/<span className="lbdg lbs">{(wordBook || []).length}語</span>}</button>}{/*#__PURE__*/<div className="lsec" style={{
           marginTop: 4
         }}>📝 テスト・学習</div>}{items.map((it, __idx) => /*#__PURE__*/<button key={it?.id ?? __idx} className="lcard" onClick={() => it.id === "grammarTest" ? openGrammarHub() : it.id === "wordTest" ? setScreen("wordHub") : it.id === "listeningTest" ? setScreen("listeningHub") : it.id === "shooter" ? setScreen("shooterHub") : it.id === "shadow" ? openAffiliateOffer(elsaCard) : it.id === "analysis" ? setScreen("analysis") : startTest(it.id)}>{/*#__PURE__*/<div key={it?.id ?? __idx} className="lcard-ico" style={{
             background: it.bg
@@ -1495,7 +1502,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
         if (/ing$/.test(lower)) return '動名詞 / 現在分詞';
         if (/ed$/.test(lower)) return '過去形 / 過去分詞';
         if (/^to\s+/.test(lower)) return 'to不定詞';
-        return '語句の意味';
+        return '';
       }
       return '';
     };

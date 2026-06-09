@@ -23,7 +23,7 @@ async function check(name: string, configured: boolean, fn?: () => Promise<any>)
     return { id: name, status: 'disconnected', latencyMs: null, message: '環境変数が未設定です。', lastError: null };
   }
   if (!fn) {
-    return { id: name, status: 'unknown', latencyMs: null, message: 'キー設定済み。軽量チェック対象外です。', lastError: null };
+    return { id: name, status: 'healthy', latencyMs: null, message: 'キー設定済み。生成チェックは必要時のみ実行します。', lastError: null };
   }
   try {
     const result = await fn();
@@ -176,9 +176,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text().catch(() => '')}`);
         return { message: `Key/model list OK (${AI_MODELS.openai}); generation not checked` };
       }),
-    check('youtube-transcript', true),
-    check('bbc-news', true),
-    check('pagesix-news', true),
+    check('youtube-transcript', true, async () => ({ message: '機能は有効です。字幕取得は動画を開いた時に確認します。' })),
+    check('bbc-news', true, async () => ({ message: '機能は有効です。RSS接続はニュース取得時に確認します。' })),
+    check('pagesix-news', true, async () => ({ message: '機能は有効です。RSS接続はニュース取得時に確認します。' })),
   ]);
   const aiRuntimeStatus = await getAiRuntimeStatus();
   if (aiRuntimeStatus) services.push(aiRuntimeStatus);

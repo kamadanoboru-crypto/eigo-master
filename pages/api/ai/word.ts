@@ -2,10 +2,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { callAI, parseJSON } from '../../../lib/aiClient';
 import { getAICache, normalizeAIInput, saveAICache } from '../../../lib/aiCache';
-import { spendCoins } from '../../../lib/economy';
+import { refundCoins, spendCoins } from '../../../lib/economy';
 import type { WordResponse } from '../../../types';
 
-const COST = 5;
+const COST = 1;
 const FALLBACK: WordResponse = { meaning: '取得できませんでした', pos: '', example: '' };
 
 export default async function handler(
@@ -52,7 +52,7 @@ export default async function handler(
   if (!payment.ok) {
     return res.status(402).json({
       ...FALLBACK,
-      error: `コインが不足しています（必要: ${COST}枚）`,
+      error: `コインが不足しています（必要: ${COST}枚、所持: ${payment.remaining}枚）`,
       fromCache: false,
       cost: COST,
       remaining: payment.remaining,
@@ -61,7 +61,7 @@ export default async function handler(
 
   const prompt = [
     `文脈: "${safeSentence}"`,
-    `単語「${safeWord}」の意味を日本語で20字以内で返してください。`,
+    `単語「${safeWord}」の意味を、日本語で20字以内の自然な表現で返してください。`,
     'JSONのみ返してください: {"meaning":"意味","pos":"品詞","example":"英語例文ひとつ"}',
   ].join('\n');
 
@@ -76,12 +76,14 @@ export default async function handler(
       cost: COST,
       remaining: payment.remaining,
     });
-  } catch {
+  } catch (error) {
+    const refund = await refundCoins(userId, COST);
     return res.status(200).json({
       ...FALLBACK,
+      error: 'AI単語確認に失敗しました。コインは消費されませんでした。',
       fromCache: false,
-      cost: COST,
-      remaining: payment.remaining,
+      cost: 0,
+      remaining: refund.total,
     });
   }
 }
