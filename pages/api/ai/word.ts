@@ -8,6 +8,19 @@ import type { WordResponse } from '../../../types';
 const COST = 1;
 const FALLBACK: WordResponse = { meaning: '取得できませんでした', pos: '', example: '' };
 
+function cleanPayload(payload: any, safeWord: string, safeSentence: string) {
+  const wordRe = new RegExp(`\\b${safeWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+  const example = String(payload?.example || '').trim();
+  const exampleJa = String(payload?.exampleJa || payload?.example_ja || '').trim();
+  return {
+    meaning: String(payload?.meaning || FALLBACK.meaning).trim(),
+    pos: String(payload?.pos || '').trim(),
+    example: example && exampleJa && wordRe.test(example) ? example : '',
+    exampleJa: example && exampleJa && wordRe.test(example) ? exampleJa : '',
+    sourceSentence: safeSentence,
+  };
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<any>,
@@ -32,8 +45,9 @@ export default async function handler(
 
   const cached = await getAICache('word', 'meaning', cacheText);
   if (cached?.payload?.meaning) {
+    const payload = cleanPayload(cached.payload, safeWord, safeSentence);
     return res.status(200).json({
-      ...cached.payload,
+      ...payload,
       fromCache: true,
       cost: 0,
     });
@@ -62,13 +76,14 @@ export default async function handler(
   const prompt = [
     `文脈: "${safeSentence}"`,
     `単語「${safeWord}」の意味を、日本語で20字以内の自然な表現で返してください。`,
-    'JSONのみ返してください: {"meaning":"意味","pos":"品詞","example":"英語例文ひとつ"}',
+    'example は同じ意味で使った短い英語例文、exampleJa はその自然な日本語訳にしてください。',
+    'JSONのみ返してください: {"meaning":"意味","pos":"品詞","example":"English example sentence.","exampleJa":"日本語訳"}',
   ].join('\n');
 
   try {
     const text = await callAI(prompt, 200);
     const parsed = parseJSON<WordResponse | null>(text, null);
-    const payload = parsed?.meaning ? parsed : FALLBACK;
+    const payload = parsed?.meaning ? cleanPayload(parsed, safeWord, safeSentence) : cleanPayload(FALLBACK, safeWord, safeSentence);
     await saveAICache('word', 'meaning', cacheText, payload);
     return res.status(200).json({
       ...payload,

@@ -2436,7 +2436,8 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
         meaning: data.meaning,
         pos: data.pos || '',
         example: data.example || '',
-        sentence,
+        exampleJa: data.exampleJa || '',
+        sentence: data.sourceSentence || sentence,
         savedAt: Date.now()
       };
       let shouldSave = false;

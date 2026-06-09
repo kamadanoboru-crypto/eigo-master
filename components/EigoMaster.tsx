@@ -101,6 +101,10 @@ function EigoMasterInner() {
     } catch (e) {}
     return [];
   });
+  const [wordBookInitial, setWordBookInitial] = useState<any>('all');
+  const [wordBookOffset, setWordBookOffset] = useState<any>(0);
+  const [wordBookHasMore, setWordBookHasMore] = useState<any>(false);
+  const [wordBookLoading, setWordBookLoading] = useState<any>(false);
   // Refs for sync scroll
   const prEnRef = typeof window !== 'undefined' ? {
     current: null
@@ -530,7 +534,7 @@ function EigoMasterInner() {
     const load = async () => {
       try {
         const uid = "user_id=eq.".concat(userId);
-        const [sLines, wLines, myL, tRes, uPts, uVids, captionRows, vVotes, allVideoVotes] = await Promise.all([sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.caption&order=saved_at.desc")), sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.word&order=saved_at.desc")), fetch("/api/list/get?userId=".concat(encodeURIComponent(userId))).then(r => r.json()), sbFrom("learning_logs").select("*&".concat(uid, "&order=created_at.asc")), sbFrom("user_points").select("*&".concat(uid)), sbFrom("user_videos").select("*&order=added_at.desc&limit=100"), sbFrom("video_captions").select("select=video_id&limit=1000"), sbFrom("video_votes").select("select=video_id,vote_type&user_id=eq.".concat(encodeURIComponent(userId), "&limit=1000")), sbFrom("video_votes").select("select=video_id,vote_type&limit=10000")]);
+        const [sLines, wLines, myL, tRes, uPts, uVids, captionRows, vVotes, allVideoVotes] = await Promise.all([sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.caption&order=saved_at.desc")), sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.word&order=saved_at.desc&limit=10")), fetch("/api/list/get?userId=".concat(encodeURIComponent(userId))).then(r => r.json()), sbFrom("learning_logs").select("*&".concat(uid, "&order=created_at.asc")), sbFrom("user_points").select("*&".concat(uid)), sbFrom("user_videos").select("*&order=added_at.desc&limit=100"), sbFrom("video_captions").select("select=video_id&limit=1000"), sbFrom("video_votes").select("select=video_id,vote_type&user_id=eq.".concat(encodeURIComponent(userId), "&limit=1000")), sbFrom("video_votes").select("select=video_id,vote_type&limit=10000")]);
         // saved_items から保存済み文を復元（Phase3: 永続化）
         if (Array.isArray(sLines) && sLines.length > 0) {
           setSaved(sLines.map((r, __idx) => {
@@ -561,6 +565,7 @@ function EigoMasterInner() {
               meaning: c.meaning || '',
               pos: c.pos || '',
               example: c.example || '',
+              exampleJa: c.exampleJa || '',
               sentence: c.sentence || '',
               savedAt: r.saved_at || Date.now(),
               _dbId: r.id
@@ -776,18 +781,10 @@ function EigoMasterInner() {
   const dbSaveWord = async item => {
     if (!SB_READY || !item?.word) return;
     try {
-      await sbFrom("saved_items").insert({
-        user_id: userId,
-        item_type: 'word',
-        content: {
-          id: item.id,
-          word: item.word,
-          meaning: item.meaning || '',
-          pos: item.pos || '',
-          example: item.example || '',
-          sentence: item.sentence || ''
-        },
-        saved_at: item.savedAt || Date.now()
+      await fetch('/api/wordbook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, item })
       });
       console.log('[DB] word_book saved:', item.word);
     } catch (e) {
@@ -797,7 +794,7 @@ function EigoMasterInner() {
   const dbDeleteWord = async word => {
     if (!SB_READY || !word) return;
     try {
-      await sbFrom("saved_items").delete("user_id=eq.".concat(userId, "&content->>word=eq.").concat(encodeURIComponent(word), "&item_type=eq.word"));
+      await fetch("/api/wordbook?userId=".concat(encodeURIComponent(userId), "&word=").concat(encodeURIComponent(word)), { method: 'DELETE' });
       console.log('[DB] word_book deleted:', word);
     } catch (e) {
       console.error('[DB] word_book delete failed:', e.message);
@@ -3325,7 +3322,113 @@ function EigoMasterInner() {
     ytReaderReady,
     ytReaderRef
   });
-  const WordBook = () => /*#__PURE__*/<div className="sa">{wordBook.length === 0 ? /*#__PURE__*/<div className="empty">{/*#__PURE__*/<div style={{ fontSize: 44, marginBottom: 10 }}>📒</div>}{/*#__PURE__*/<div className="jp" style={{ fontSize: 15, fontWeight: 700, color: "var(--t)" }}>単語帳はまだ空です</div>}{/*#__PURE__*/<div className="jp" style={{ fontSize: 12, color: "var(--t2)", marginTop: 6, lineHeight: 1.7 }}>ニュースで単語をタップすると、意味を確認した単語がここに保存されます。</div>}</div> : /*#__PURE__*/<div className="slist">{/*#__PURE__*/<div className="jp" style={{ fontSize: 13, color: "var(--t3)", padding: "2px 2px 6px" }}>{wordBook.length}語保存済み</div>}{wordBook.map((item, __idx) => /*#__PURE__*/<div key={(item?.word || __idx)} className="scard" style={{ display: "block" }}>{/*#__PURE__*/<div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>{/*#__PURE__*/<div style={{ minWidth: 0 }}>{/*#__PURE__*/<div style={{ fontSize: 20, fontWeight: 800, color: "var(--t)" }}>{item.word}</div>}{item.pos && /*#__PURE__*/<div style={{ fontSize: 11, color: "var(--t3)", fontStyle: "italic", marginTop: 1 }}>{item.pos}</div>}</div>}{/*#__PURE__*/<button className="bg" style={{ padding: "6px 9px", fontSize: 11, flexShrink: 0 }} onClick={() => { setWordBook(list => (list || []).filter(w => String(w.word || '').toLowerCase() !== String(item.word || '').toLowerCase())); dbDeleteWord(item.word); }}>削除</button>}</div>}{/*#__PURE__*/<div className="jp" style={{ fontSize: 14, color: "#92400E", fontWeight: 700, marginTop: 8 }}>{item.meaning}</div>}{item.example && /*#__PURE__*/<div style={{ fontSize: 12, color: "var(--t2)", borderTop: "1px solid var(--bd)", marginTop: 9, paddingTop: 8, fontStyle: "italic" }}>例: {item.example}</div>}{item.sentence && /*#__PURE__*/<div className="jp" style={{ fontSize: 11, color: "var(--t3)", marginTop: 7, lineHeight: 1.6 }}>{item.sentence}</div>}</div>)}{/*#__PURE__*/<button className="bp" style={{ marginTop: 8, width: "100%" }} onClick={() => setScreen("wordHub")}>単語テストへ</button>}</div>}</div>;
+  const loadWordBook = async function (initial = wordBookInitial, offset = 0) {
+    if (!SB_READY) return;
+    setWordBookLoading(true);
+    try {
+      const r = await fetch("/api/wordbook?userId=".concat(encodeURIComponent(userId), "&initial=").concat(encodeURIComponent(initial), "&limit=10&offset=").concat(offset));
+      const data = await r.json();
+      if (Array.isArray(data?.items)) {
+        setWordBook(prev => offset > 0 ? [...(prev || []), ...data.items] : data.items);
+        setWordBookHasMore(Boolean(data.hasMore));
+        setWordBookOffset(offset + data.items.length);
+      }
+    } catch (e) {
+      console.error('[word_book] load failed:', e);
+    } finally {
+      setWordBookLoading(false);
+    }
+  };
+  const WordBook = () => {
+    const initials = ['all', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
+    const selectInitial = ch => {
+      setWordBookInitial(ch);
+      setWordBookOffset(0);
+      loadWordBook(ch, 0);
+    };
+    React.useEffect(() => {
+      if (SB_READY && !(wordBook || []).length && !wordBookLoading) loadWordBook(wordBookInitial, 0);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    return (
+      <div className="sa">
+        <div style={{ padding: "12px 16px 4px" }}>
+          <div className="jp" style={{ fontSize: 13, color: "var(--t3)", marginBottom: 8 }}>
+            {wordBookInitial === 'all' ? `${wordBook.length}語表示中` : `${wordBookInitial} から始まる単語`}
+          </div>
+          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6 }}>
+            {initials.map(ch => (
+              <button
+                key={ch}
+                className="bg"
+                style={{
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  flexShrink: 0,
+                  borderColor: wordBookInitial === ch ? "var(--p)" : "var(--bd)",
+                  color: wordBookInitial === ch ? "var(--p)" : "var(--t2)",
+                  background: wordBookInitial === ch ? "var(--pl)" : "var(--sur)"
+                }}
+                onClick={() => selectInitial(ch)}
+              >
+                {ch === 'all' ? '全' : ch}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {wordBook.length === 0 && !wordBookLoading ? (
+          <div className="empty">
+            <div style={{ fontSize: 44, marginBottom: 10 }}>📒</div>
+            <div className="jp" style={{ fontSize: 15, fontWeight: 700, color: "var(--t)" }}>単語帳はまだ空です</div>
+            <div className="jp" style={{ fontSize: 12, color: "var(--t2)", marginTop: 6, lineHeight: 1.7 }}>
+              ニュースで単語をタップすると、意味を確認した単語がSupabaseに保存されます。
+            </div>
+          </div>
+        ) : (
+          <div className="slist">
+            {wordBook.map((item, __idx) => (
+              <div key={item?.word || __idx} className="scard" style={{ display: "block" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: "var(--t)" }}>{item.word}</div>
+                    {item.pos && <div style={{ fontSize: 11, color: "var(--t3)", fontStyle: "italic", marginTop: 1 }}>{item.pos}</div>}
+                  </div>
+                  <button
+                    className="bg"
+                    style={{ padding: "6px 9px", fontSize: 11, flexShrink: 0 }}
+                    onClick={() => {
+                      setWordBook(list => (list || []).filter(w => String(w.word || '').toLowerCase() !== String(item.word || '').toLowerCase()));
+                      dbDeleteWord(item.word);
+                    }}
+                  >
+                    削除
+                  </button>
+                </div>
+                <div className="jp" style={{ fontSize: 14, color: "#92400E", fontWeight: 700, marginTop: 8 }}>{item.meaning}</div>
+                {item.example && item.exampleJa && (
+                  <div style={{ borderTop: "1px solid var(--bd)", marginTop: 9, paddingTop: 8 }}>
+                    <div style={{ fontSize: 12, color: "var(--t2)", fontStyle: "italic" }}>例: {item.example}</div>
+                    <div className="jp" style={{ fontSize: 12, color: "var(--t2)", marginTop: 4 }}>訳: {item.exampleJa}</div>
+                  </div>
+                )}
+                {item.sentence && (
+                  <div className="jp" style={{ fontSize: 11, color: "var(--t3)", marginTop: 8, lineHeight: 1.6 }}>
+                    <b>出典文: </b>{item.sentence}
+                  </div>
+                )}
+              </div>
+            ))}
+            {wordBookLoading && <div className="tp-ld"><div className="spin" /><span>読み込み中...</span></div>}
+            {wordBookHasMore && !wordBookLoading && (
+              <button className="bg" style={{ width: "100%" }} onClick={() => loadWordBook(wordBookInitial, wordBookOffset)}>さらに10件</button>
+            )}
+            <button className="bp" style={{ marginTop: 8, width: "100%" }} onClick={() => setScreen("wordHub")}>単語テストへ</button>
+          </div>
+        )}
+      </div>
+    );
+  };
   const isTest = ["wordTest", "grammarTest", "listeningTest"].includes(screen);
   const isVideo = screen === "video";
   const isVideoLibrary = screen === "videoLibrary";
