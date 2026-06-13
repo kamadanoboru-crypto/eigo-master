@@ -105,6 +105,7 @@ function EigoMasterInner() {
   const [wordBookOffset, setWordBookOffset] = useState<any>(0);
   const [wordBookHasMore, setWordBookHasMore] = useState<any>(false);
   const [wordBookLoading, setWordBookLoading] = useState<any>(false);
+  const [wordBookLoaded, setWordBookLoaded] = useState<any>(false);
   // Refs for sync scroll
   const prEnRef = typeof window !== 'undefined' ? {
     current: null
@@ -3330,7 +3331,10 @@ function EigoMasterInner() {
     ytReaderRef
   });
   const loadWordBook = async function (initial = wordBookInitial, offset = 0) {
-    if (!SB_READY) return;
+    if (!SB_READY) {
+      setWordBookLoaded(true);
+      return;
+    }
     setWordBookLoading(true);
     try {
       const r = await fetch("/api/wordbook?userId=".concat(encodeURIComponent(userId), "&initial=").concat(encodeURIComponent(initial), "&limit=10&offset=").concat(offset));
@@ -3343,6 +3347,7 @@ function EigoMasterInner() {
     } catch (e) {
       console.error('[word_book] load failed:', e);
     } finally {
+      setWordBookLoaded(true);
       setWordBookLoading(false);
     }
   };
@@ -3351,10 +3356,11 @@ function EigoMasterInner() {
     const selectInitial = ch => {
       setWordBookInitial(ch);
       setWordBookOffset(0);
+      setWordBookLoaded(false);
       loadWordBook(ch, 0);
     };
     React.useEffect(() => {
-      if (SB_READY && !(wordBook || []).length && !wordBookLoading) loadWordBook(wordBookInitial, 0);
+      if (!wordBookLoaded && !wordBookLoading) loadWordBook(wordBookInitial, 0);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     return (
@@ -3389,7 +3395,7 @@ function EigoMasterInner() {
             <div style={{ fontSize: 44, marginBottom: 10 }}>📒</div>
             <div className="jp" style={{ fontSize: 15, fontWeight: 700, color: "var(--t)" }}>単語帳はまだ空です</div>
             <div className="jp" style={{ fontSize: 12, color: "var(--t2)", marginTop: 6, lineHeight: 1.7 }}>
-              ニュースで単語をタップすると、意味を確認した単語がSupabaseに保存されます。
+              まだ登録された単語はありません。ニュースや英文リーダーで単語をタップすると、意味を確認した単語が保存されます。
             </div>
           </div>
         ) : (
@@ -3401,16 +3407,6 @@ function EigoMasterInner() {
                     <div style={{ fontSize: 20, fontWeight: 800, color: "var(--t)" }}>{item.word}</div>
                     {item.pos && <div style={{ fontSize: 11, color: "var(--t3)", fontStyle: "italic", marginTop: 1 }}>{item.pos}</div>}
                   </div>
-                  <button
-                    className="bg"
-                    style={{ padding: "6px 9px", fontSize: 11, flexShrink: 0 }}
-                    onClick={() => {
-                      setWordBook(list => (list || []).filter(w => String(w.word || '').toLowerCase() !== String(item.word || '').toLowerCase()));
-                      dbDeleteWord(item.word);
-                    }}
-                  >
-                    削除
-                  </button>
                 </div>
                 <div className="jp" style={{ fontSize: 14, color: "#92400E", fontWeight: 700, marginTop: 8 }}>{item.meaning}</div>
                 {item.example && item.exampleJa && (
@@ -3836,18 +3832,6 @@ function EigoMasterInner() {
                 }));
                 addUrl("https://www.youtube.com/watch?v=aGJDmCgG44c");
               }}>TED</button>}{/*#__PURE__*/<button className="bg" style={{
-                padding: '6px 12px',
-                fontSize: 11,
-                flex: '1 1 auto',
-                background: '#fff',
-                borderColor: 'var(--bd)'
-              }} onClick={() => {
-                setProc(p => ({
-                  ...p,
-                  active: false
-                }));
-                addUrl("https://www.youtube.com/watch?v=MhJEw1U6mB4");
-              }}>BBC Learning English</button>}{/*#__PURE__*/<button className="bg" style={{
                 padding: '6px 12px',
                 fontSize: 11,
                 flex: '1 1 auto',

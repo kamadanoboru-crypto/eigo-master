@@ -244,11 +244,6 @@ const GLOBAL_VIDEOS = [{
   channelTitle: "TED",
   thumbnail: "https://img.youtube.com/vi/aGJDmCgG44c/mqdefault.jpg"
 }, {
-  videoId: "MhJEw1U6mB4",
-  title: "BBC Learning English Sample",
-  channelTitle: "BBC Learning English",
-  thumbnail: "https://img.youtube.com/vi/MhJEw1U6mB4/mqdefault.jpg"
-}, {
   videoId: "F0fE-rFk-pE",
   title: "English Speeches Sample",
   channelTitle: "English Speeches",

@@ -24,26 +24,6 @@ const RAKUTEN_TOEIC_OFFICIAL_12_URL =
 
 export const ADVICE_SITE_CATALOG: AdviceSite[] = [
   {
-    key: 'bbc-learning-english',
-    title: 'BBC Learning English',
-    description: '短いニュースや会話で、自然な英語の聞き取りを増やせます。',
-    url: 'https://www.bbc.co.uk/learningenglish',
-    affiliate_url: envUrl('bbc') || '',
-    tags: ['リスニング', '初心者', 'ニュース'],
-    level_range: [350, 750],
-    category: 'リスニング',
-  },
-  {
-    key: 'abceed-toeic',
-    title: 'abceed TOEIC',
-    description: 'TOEIC形式の演習量を増やしたい時に使いやすい学習アプリです。',
-    url: 'https://www.abceed.com/',
-    affiliate_url: envUrl('abceed') || envUrl('toeic') || '',
-    tags: ['TOEIC', '文法', '単語'],
-    level_range: [450, 900],
-    category: 'TOEIC',
-  },
-  {
     key: 'rakuten-toeic-official-12',
     title: 'TOEIC公式問題集 12',
     description: 'アプリ練習の仕上げに、本番形式の模試で時間配分を確認できます。',

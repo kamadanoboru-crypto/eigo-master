@@ -11,11 +11,9 @@ type Props = {
 
 export default function BlogArticle({ post }: Props) {
   const categories = getBlogCategories(post);
-  const isConversation = categories.some((category) =>
-    ['speaking', 'ai_conversation', 'overseas', 'conversation'].includes(category),
-  );
   const isComparison = categories.includes('comparison');
-  const primaryService = isConversation ? 'cambly' : 'study_sapuri';
+  const postIndex = Math.max(0, blogPosts.findIndex((item) => item.slug === post.slug));
+  const primaryService = postIndex % 2 === 0 ? 'study_sapuri' : 'cambly';
 
   return (
     <SiteLayout title={`${post.title} | English Base`} description={post.description}>
