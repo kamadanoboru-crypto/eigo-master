@@ -1,12 +1,18 @@
 import type { AppProps } from 'next/app';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import Script from 'next/script';
 import { useEffect } from 'react';
 import './globals.css';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+const SITE_URL = 'https://eigo-master.vercel.app';
 
 export default function App({ Component, pageProps }: AppProps) {
+  const { asPath } = useRouter();
+  const canonicalPath = asPath.split(/[?#]/)[0];
+  const canonicalUrl = `${SITE_URL}${canonicalPath}`;
+
   useEffect(() => {
     import('../lib/nativeAppBridge')
       .then(({ initNativeAppBridge }) => initNativeAppBridge())
@@ -28,6 +34,8 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="apple-mobile-web-app-title" content="English Base" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="canonical" href={canonicalUrl} />
+        <meta property="og:url" content={canonicalUrl} />
         <title>English Base</title>
       </Head>
       {GA_ID ? (
