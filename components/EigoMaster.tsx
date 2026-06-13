@@ -1372,7 +1372,7 @@ function EigoMasterInner() {
     let showToast = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : false;
     const reader = ytReaderRef.current;
     if (!reader) {
-      if (showToast) t$('YouTubeプレイヤーの準備中です');
+      if (showToast) t$('YouTubeプレイヤーを読み込み中です');
       return;
     }
     let listForSync = captionsRef.current || caps;
@@ -2081,30 +2081,37 @@ function EigoMasterInner() {
       })
     }).catch(() => {});
   };
-  const openStudySapuriOffer = useCallback((screenName, url, label) => {
-    logAffiliateClick('study_sapuri', label, toeic, {
-      affiliateName: 'study_sapuri',
-      screenName
+  const openAffiliateServiceOffer = useCallback((service, screenName, placement, url, label) => {
+    logAffiliateClick(service, label, toeic, {
+      affiliateName: service,
+      screenName,
+      placement: placement || screenName
     });
     window.open(url, '_blank', 'noopener,noreferrer');
   }, [toeic, userId]);
   const StudySapuriCard = useCallback(function (props = {}) {
     const {
       screenName = 'home',
+      placement,
+      service = 'study_sapuri',
       variant = 'home',
       compact = false
     } = props;
     const isToeic = variant === 'toeic';
     const isTrial = variant === 'trial';
-    const url = isTrial ? AFFILIATE_LINKS.STUDY_SUPPLI_TRIAL : isToeic ? AFFILIATE_LINKS.STUDY_SUPPLI_TOEIC : AFFILIATE_LINKS.STUDY_SUPPLI_HOME;
-    const cta = isTrial ? 'まずは無料体験' : isToeic ? 'TOEIC対策はこちら' : 'スタディサプリ ENGLISH';
-    const title = isTrial ? '学習継続おめでとうございます' : 'おすすめ教材';
+    const isCambly = service === 'cambly';
+    const url = isCambly ? isTrial ? AFFILIATE_LINKS.CAMBLY_TRIAL : isToeic ? AFFILIATE_LINKS.CAMBLY_DETAIL : AFFILIATE_LINKS.CAMBLY_HOME : isTrial ? AFFILIATE_LINKS.STUDY_SUPPLI_TRIAL : isToeic ? AFFILIATE_LINKS.STUDY_SUPPLI_TOEIC : AFFILIATE_LINKS.STUDY_SUPPLI_HOME;
+    const cta = isCambly ? isTrial ? 'Camblyトライアル' : 'Cambly公式サイトで詳細を見る' : isTrial ? 'まずは無料体験' : isToeic ? 'TOEIC対策はこちら' : 'スタディサプリ ENGLISH';
+    const title = isTrial ? '学習継続おめでとうございます' : isCambly ? '英会話実践におすすめ' : 'おすすめ教材';
     const nextToeicTarget = toeic < 700 ? 700 : toeic < 800 ? 800 : 900;
     const toeicGap = Math.max(0, nextToeicTarget - toeic);
-    const desc = isTrial ? '次のレベルへ進みませんか？' : isToeic ? "あと".concat(toeicGap, "点で").concat(nextToeicTarget, "点です。TOEIC対策をまとめて進められます。") : '毎日の英語学習に、TOEIC対策コースを組み合わせられます。';
+    const desc = isCambly ? isTrial ? 'AIで練習した英語を、次はネイティブ講師との会話で試せます。' : 'ネイティブ講師と英会話を実践したい方へ。AI英会話の次のステップにできます。' : isTrial ? '次のレベルへ進みませんか？' : isToeic ? "あと".concat(toeicGap, "点で").concat(nextToeicTarget, "点です。TOEIC対策をまとめて進められます。") : '毎日の英語学習に、TOEIC対策コースを組み合わせられます。';
+    const color = isCambly ? '#0F766E' : '#B88932';
+    const icon = isCambly ? '🗣️' : '🎓';
+    const serviceTitle = isCambly ? 'Cambly' : 'スタディサプリ ENGLISH';
     return /*#__PURE__*/<div className="afcard" style={{
       margin: compact ? "8px 0" : "8px 16px 12px",
-      borderColor: "#B8893233",
+      borderColor: color + "33",
       background: "#fff",
       boxShadow: compact ? "none" : "var(--sh)"
     }}>{/*#__PURE__*/<div style={{
@@ -2114,33 +2121,33 @@ function EigoMasterInner() {
       }}>{/*#__PURE__*/<div style={{
           fontSize: 24,
           lineHeight: 1
-        }}>🎓</div>}{/*#__PURE__*/<div style={{
+        }}>{icon}</div>}{/*#__PURE__*/<div style={{
           flex: 1,
           minWidth: 0
         }}>{/*#__PURE__*/<div className="afbdg" style={{
-            background: "#B8893214",
-            color: "#8A5A18"
+            background: color + "14",
+            color
           }}>{title}</div>}{/*#__PURE__*/<div className="jp" style={{
             fontSize: 14,
             fontWeight: 700,
             color: "var(--t)",
             marginBottom: 3
-          }}>スタディサプリ ENGLISH</div>}{/*#__PURE__*/<div className="jp" style={{
+          }}>{serviceTitle}</div>}{/*#__PURE__*/<div className="jp" style={{
             fontSize: 12,
             color: "var(--t2)",
             lineHeight: 1.55,
             marginBottom: 10
           }}>{desc}</div>}{/*#__PURE__*/<button className="afcta" style={{
-            background: "#B88932"
-          }} onClick={() => openStudySapuriOffer(screenName, url, cta)}>{cta}</button>}</div>}</div>}</div>;
-  }, [openStudySapuriOffer]);
+            background: color
+          }} onClick={() => openAffiliateServiceOffer(service, screenName, placement, url, cta)}>{cta}</button>}</div>}</div>}</div>;
+  }, [openAffiliateServiceOffer]);
   const openAffiliateOffer = useCallback(function () {
     let card = arguments.length > 0 && arguments[0] !== void 0 ? arguments[0] : afCard;
     if (!card) return;
     var _card_key;
     logAffiliateClick((_card_key = card.key) !== null && _card_key !== void 0 ? _card_key : '', card.title, toeic);
     if (card.url && card.url !== '#') {
-      window.open(card.url, '_blank', 'noopener');
+      window.open(card.url, '_blank', 'noopener,noreferrer');
     } else {
       t$('紹介リンクは未設定です。環境変数 NEXT_PUBLIC_AFFILIATE_*_URL を設定してください。', 'warn');
     }

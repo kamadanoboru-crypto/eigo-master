@@ -24,6 +24,7 @@ export default function SiteLayout({ title, description, children }: SiteLayoutP
           <nav className={styles.nav} aria-label="メインナビゲーション">
             <Link href="/">ホーム</Link>
             <Link href="/blog">学習コラム</Link>
+            <Link href="/recommend/english-learning-services">おすすめ教材</Link>
             <Link href="/faq">FAQ</Link>
             <Link href="/about">このサイトについて</Link>
             <Link href="/contact">お問い合わせ</Link>
@@ -34,6 +35,7 @@ export default function SiteLayout({ title, description, children }: SiteLayoutP
           <div className={styles.footerLinks}>
             <Link href="/">ホーム</Link>
             <Link href="/blog">学習コラム</Link>
+            <Link href="/recommend/english-learning-services">おすすめ教材</Link>
             <Link href="/faq">FAQ</Link>
             <Link href="/about">このサイトについて</Link>
             <Link href="/terms">利用規約</Link>

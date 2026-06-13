@@ -2,6 +2,7 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useState } from 'react';
+import AffiliateCard from '../components/AffiliateCard';
 import SiteLayout from '../components/SiteLayout';
 import { blogPosts } from '../lib/blogPosts';
 import styles from './pages.module.css';
@@ -55,14 +56,27 @@ export default function Home() {
         </section>
 
         <section className={styles.section}>
+          <h2>English Baseとは</h2>
+          <p>
+            English Baseは、英語学習を続けやすくするためのAI学習サービスです。
+            TOEIC単語、Part5対策、YouTubeリスニング、AI英会話、学習履歴を組み合わせ、
+            短い時間でも「学ぶ、解く、聞く、見直す」を繰り返せる場所を目指しています。
+          </p>
+          <p>
+            Web版では、学習コラム、FAQ、教材紹介、アプリ体験への導線を公開し、
+            ログインしなくても英語学習に役立つ情報を読めるようにしています。
+          </p>
+        </section>
+
+        <section className={styles.section}>
           <h2>できること</h2>
           <div className={styles.cardGrid}>
             <div className={styles.infoCard}><h3>TOEIC頻出単語</h3><p>4択テストや復習機能で、意味を素早く判断する練習ができます。</p></div>
             <div className={styles.infoCard}><h3>Part5英文法</h3><p>空所補充問題を通して、品詞、時制、前置詞、接続詞を確認できます。</p></div>
             <div className={styles.infoCard}><h3>動画リスニング</h3><p>YouTubeの英語動画を使い、字幕、対訳、単語確認を学習に変えられます。</p></div>
-            <div className={styles.infoCard}><h3>AI学習補助</h3><p>翻訳、単語説明、学習アドバイスなどを、復習のきっかけとして活用できます。</p></div>
+            <div className={styles.infoCard}><h3>AI英会話・学習補助</h3><p>英会話練習、翻訳、単語説明、学習アドバイスを、復習のきっかけとして活用できます。</p></div>
             <div className={styles.infoCard}><h3>学習履歴</h3><p>ミスした問題や保存した内容を見直し、次の学習に戻せます。</p></div>
-            <div className={styles.infoCard}><h3>学習コミュニティ</h3><p>共有動画や投稿を通して、他の学習者の教材にも触れられます。</p></div>
+            <div className={styles.infoCard}><h3>コイン・ガチャ機能</h3><p>Android版では、広告リワードやコインを使った学習継続機能を予定しています。</p></div>
           </div>
         </section>
 
@@ -73,6 +87,7 @@ export default function Home() {
             <li>英語学習が続かず、短時間で再開できる場所を作りたい人</li>
             <li>YouTubeやニュースを英語学習の素材として使いたい人</li>
             <li>AIの説明を参考にしながら、自分の弱点を整理したい人</li>
+            <li>社会人のやり直し英語を、スマホとスキマ時間で始めたい人</li>
           </ul>
         </section>
 
@@ -87,9 +102,9 @@ export default function Home() {
         </section>
 
         <section className={styles.section}>
-          <h2>学習コラム</h2>
+          <h2>最新記事</h2>
           <div className={styles.blogList}>
-            {blogPosts.slice(0, 4).map((post) => (
+            {blogPosts.slice(0, 5).map((post) => (
               <Link key={post.slug} href={`/blog/${post.slug}`} className={styles.blogCard}>
                 <h2>{post.title}</h2>
                 <p>{post.description}</p>
@@ -98,6 +113,33 @@ export default function Home() {
             ))}
           </div>
           <p><Link href="/blog" className={styles.textLink}>すべての学習コラムを見る</Link></p>
+        </section>
+
+        <section className={styles.section}>
+          <h2>おすすめ学習サービス</h2>
+          <p>
+            English Baseで単語やPart5の基礎を確認し、TOEICの本格対策には講義型教材を併用する方法もあります。
+            AI英会話に慣れてきたら、ネイティブ講師との実践練習へ進む選択肢もあります。
+          </p>
+          <AffiliateCard
+            service="study_sapuri"
+            placement="home"
+            variant="compact"
+            urlKey="home"
+            reason="TOEIC対策を本格的に進めたい方へ。講義と演習で文法、リスニング、スコアアップの流れを作れます。"
+          />
+          <AffiliateCard
+            service="cambly"
+            placement="home"
+            variant="compact"
+            urlKey="home"
+            reason="ネイティブ講師と英会話を実践したい方へ。AI練習の次に、実際の会話でアウトプットできます。"
+          />
+          <p>
+            <Link href="/recommend/english-learning-services" className={styles.textLink}>
+              English Base・スタディサプリENGLISH・Camblyの使い分けを見る
+            </Link>
+          </p>
         </section>
 
         <section className={styles.section}>

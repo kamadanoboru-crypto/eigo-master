@@ -11,13 +11,14 @@ const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { userId, cardKey, cardTitle, toeicScore, affiliateName, screenName } = req.body as {
-    userId?: string; cardKey?: string; cardTitle?: string; toeicScore?: number; affiliateName?: string; screenName?: string;
+  const { userId, cardKey, cardTitle, toeicScore, affiliateName, screenName, placement } = req.body as {
+    userId?: string; cardKey?: string; cardTitle?: string; toeicScore?: number; affiliateName?: string; screenName?: string; placement?: string;
   };
   const safeAffiliateName = affiliateName || (cardKey === 'study_sapuri' ? 'study_sapuri' : undefined);
   const safeScreenName = screenName || cardKey || 'unknown';
+  const safePlacement = placement || safeScreenName;
 
-  if (SB_URL && userId && (cardKey || safeAffiliateName)) {
+  if (SB_URL && (cardKey || safeAffiliateName)) {
     try {
       const insertClick = (body: Record<string, unknown>) => fetch(`${SB_URL}/rest/v1/affiliate_clicks`, {
         method: 'POST',
@@ -28,18 +29,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         body: JSON.stringify(body),
       });
       const full = await insertClick({
-        user_id: userId,
+        user_id: userId || null,
         card_key: cardKey || safeAffiliateName,
         card_title: cardTitle || safeAffiliateName,
         toeic_score: toeicScore,
         affiliate_name: safeAffiliateName || cardKey,
         screen_name: safeScreenName,
+        placement: safePlacement,
       });
       if (!full.ok) {
         const modern = await insertClick({
-          user_id: userId,
+          user_id: userId || null,
           affiliate_name: safeAffiliateName || cardKey,
           screen_name: safeScreenName,
+          placement: safePlacement,
         });
         if (!modern.ok && cardKey) {
           await insertClick({ user_id: userId, card_key: cardKey, card_title: cardTitle, toeic_score: toeicScore });
@@ -48,6 +51,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } catch { /* ignore */ }
   }
 
-  console.log(`[affiliate] click: ${safeAffiliateName || cardKey} screen=${safeScreenName} userId=${userId?.slice(0,8)} toeic=${toeicScore}`);
+  console.log(`[affiliate] click: ${safeAffiliateName || cardKey} screen=${safeScreenName} placement=${safePlacement} userId=${userId?.slice(0,8)} toeic=${toeicScore}`);
   return res.status(200).json({ ok: true });
 }

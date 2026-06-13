@@ -644,7 +644,8 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
     const sites = Array.isArray(selected === null || selected === void 0 ? void 0 : selected.recommended_sites) ? selected.recommended_sites : [];
     const dateText = (selected === null || selected === void 0 ? void 0 : selected.created_at) ? new Date(selected.created_at).toLocaleDateString('ja-JP') : '';
     const adviceText = [ai?.summary, ai?.advice, ...(Array.isArray(ai?.focus) ? ai.focus : []), ...(Array.isArray(ai?.next_actions) ? ai.next_actions : [])].filter(Boolean).join(' ');
-    const shouldShowToeicMaterial = /Part\s*3|Part\s*4|リスニング|TOEIC|長文読解/i.test(adviceText);
+    const shouldShowToeicMaterial = /Part\s*3|Part\s*4|リスニング|TOEIC|長文読解|文法|単語|Part5/i.test(adviceText);
+    const shouldShowCamblyMaterial = /英会話|発話|スピーキング|アウトプット|海外赴任|ネイティブ表現|会話/i.test(adviceText);
     var _selected_toeic_estimate;
     return /*#__PURE__*/<div className="sa">{/*#__PURE__*/<div className="lhub">{/*#__PURE__*/<div style={{
           background: "linear-gradient(135deg,#FFFDF8,#EEF3F8)",
@@ -754,7 +755,7 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
               fontSize: 12,
               color: "var(--t)",
               lineHeight: 1.7
-            }}>・{a}</div>)}</div>}{shouldShowToeicMaterial && /*#__PURE__*/<StudySapuriCard screenName="ai_analysis" variant="toeic" compact />}</div>}{sites.length > 0 && /*#__PURE__*/<>{/*#__PURE__*/<div className="lsec">おすすめ学習サイト</div>}{sites.map((site, __idx) => /*#__PURE__*/<div key={site?.id ?? __idx} className="lcard" style={{
+            }}>・{a}</div>)}</div>}{shouldShowCamblyMaterial ? /*#__PURE__*/<StudySapuriCard screenName="ai_analysis" placement="ai_analysis" service="cambly" variant="home" compact /> : shouldShowToeicMaterial && /*#__PURE__*/<StudySapuriCard screenName="ai_analysis" placement="ai_analysis" variant="toeic" compact />}</div>}{sites.length > 0 && /*#__PURE__*/<>{/*#__PURE__*/<div className="lsec">おすすめ学習サイト</div>}{sites.map((site, __idx) => /*#__PURE__*/<div key={site?.id ?? __idx} className="lcard" style={{
             alignItems: "flex-start"
           }}>{/*#__PURE__*/<div key={site?.id ?? __idx} className="lcard-ico" style={{
               background: "#F0FDF4"

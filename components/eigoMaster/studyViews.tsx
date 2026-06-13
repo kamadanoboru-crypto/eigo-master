@@ -389,6 +389,16 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
     ytReaderReady,
     ytReaderRef
   } = deps;
+  const getStreakAffiliateService = () => {
+    const streak = Number(streakStats?.streak || 0);
+    if (![7, 30, 100].includes(streak)) return '';
+    const key = `affiliate_streak_seen_${streak}`;
+    try {
+      if (typeof window !== 'undefined' && localStorage.getItem(key)) return '';
+      if (typeof window !== 'undefined') localStorage.setItem(key, new Date().toISOString());
+    } catch (e) {}
+    return streak >= 30 ? 'cambly' : 'study_sapuri';
+  };
   const elsaCard = {
     key: 'elsa',
     title: 'ELSA Speak',
@@ -757,7 +767,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
           }}>{safeVideoPage * videoPageSize + 1}-{Math.min(dVids.length, safeVideoPage * videoPageSize + pageVids.length)} / {dVids.length}</span>}{/*#__PURE__*/<button className="bg" style={{
             flex: 1,
             fontSize: 12
-          }} disabled={safeVideoPage >= totalVideoPages - 1} onClick={() => setVideoPage(p => Math.min(totalVideoPages - 1, p + 1))}>次へ</button>}</div>}</div>)}{/*#__PURE__*/<StudySapuriCard screenName="home" variant="home" />}{[7, 30, 100].includes(streakStats.streak) && /*#__PURE__*/<StudySapuriCard screenName="streak" variant="trial" />}{/*#__PURE__*/<div className="divhr" />}{/*#__PURE__*/<div style={{
+          }} disabled={safeVideoPage >= totalVideoPages - 1} onClick={() => setVideoPage(p => Math.min(totalVideoPages - 1, p + 1))}>次へ</button>}</div>}</div>)}{/*#__PURE__*/<StudySapuriCard screenName="home" placement="home" variant="home" />}{(() => { const service = getStreakAffiliateService(); return service ? /*#__PURE__*/<StudySapuriCard screenName="streak" placement="streak" service={service} variant="trial" /> : null; })()}{/*#__PURE__*/<div className="divhr" />}{/*#__PURE__*/<div style={{
         margin: "0 16px 8px",
         background: "linear-gradient(135deg,#FFF7ED,#FFEDD5)",
         borderRadius: "var(--r)",
@@ -1258,7 +1268,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
               fontSize: 11,
               color: "var(--t3)",
               lineHeight: 1.5
-            }}>アプリ練習の仕上げに、紙の模試で時間配分を確認できます。</div>}</div>}{/*#__PURE__*/<a href={RAKUTEN_TOEIC_OFFICIAL_URL} target="_blank" rel="nofollow sponsored noreferrer" onClick={() => logAffiliateClick('rakuten-toeic-official-12', 'TOEIC公式問題集 12', toeic)} className="bg" style={{
+            }}>アプリ練習の仕上げに、紙の模試で時間配分を確認できます。</div>}</div>}{/*#__PURE__*/<a href={RAKUTEN_TOEIC_OFFICIAL_URL} target="_blank" rel="nofollow sponsored noopener noreferrer" onClick={() => logAffiliateClick('rakuten-toeic-official-12', 'TOEIC公式問題集 12', toeic)} className="bg" style={{
             fontSize: 12,
             padding: "7px 10px",
             textDecoration: "none",
@@ -1792,7 +1802,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
             fontFamily: "'Noto Sans JP'",
             width: "100%",
             fontSize: 13
-          }} onClick={() => openRew(() => t$("🔖 間違い問題を保存しました！"))}>広告を見て保存する →</button>}</div>}{sett.affOn && /*#__PURE__*/<div style={{
+          }} onClick={() => openRew(() => t$("🔖 間違い問題を保存しました！"))}>広告を見て保存する →</button>}</div>}{(isG || isL || isW) && /*#__PURE__*/<StudySapuriCard screenName={isG ? "grammar_result" : isL ? "listening_result" : "word_result"} placement="toeic_result" variant="toeic" compact />}{sett.affOn && /*#__PURE__*/<div style={{
           width: "100%",
           marginBottom: 14
         }}>{/*#__PURE__*/<div className="afcard" style={{
@@ -1817,7 +1827,7 @@ export function useStudyViews(deps: EigoMasterViewDeps) {
             }} onClick={() => {
               var _afCard_key;
               logAffiliateClick((_afCard_key = afCard.key) !== null && _afCard_key !== void 0 ? _afCard_key : '', afCard.title, toeic);
-              if (afCard.url && afCard.url !== '#') window.open(afCard.url, '_blank', 'noopener');else t$('🔗 外部サービスへ（URL未設定 - lib/affiliateConfig.tsで設定）');
+              if (afCard.url && afCard.url !== '#') window.open(afCard.url, '_blank', 'noopener,noreferrer');else t$('🔗 外部サービスへ（URL未設定 - lib/affiliateConfig.tsで設定）');
             }}>{afCard.cta}</button>}</div>}</div>}{/*#__PURE__*/<div style={{
           display: "flex",
           gap: 10,

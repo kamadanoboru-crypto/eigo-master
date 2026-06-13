@@ -165,7 +165,11 @@ export function HomeDashboard({
           )}
         </div>
 
-        <StudySapuriCard screenName="home" variant="home" />
+        <div className="jp" style={{ fontSize: 12, fontWeight: 800, color: "var(--t)", margin: "2px 2px -4px" }}>
+          おすすめ学習サービス
+        </div>
+        <StudySapuriCard screenName="home" placement="home" variant="home" />
+        <StudySapuriCard screenName="home" placement="home" service="cambly" variant="home" />
       </div>
     </div>
   );
