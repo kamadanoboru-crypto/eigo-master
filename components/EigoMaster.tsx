@@ -94,13 +94,7 @@ function EigoMasterInner() {
   const [prPopup, setPrPopup] = useState<any>(false);
   const [prMemo, setPrMemo] = useState<any>('');
   const [prSaved, setPrSaved] = useState<any>([]); // [{id,type,word,meaning,memo,date}]
-  const [wordBook, setWordBook] = useState<any>(() => {
-    try {
-      const s = typeof window !== 'undefined' && localStorage.getItem('em_word_book');
-      if (s) return JSON.parse(s);
-    } catch (e) {}
-    return [];
-  });
+  const [wordBook, setWordBook] = useState<any>([]);
   const [wordBookInitial, setWordBookInitial] = useState<any>('all');
   const [wordBookOffset, setWordBookOffset] = useState<any>(0);
   const [wordBookHasMore, setWordBookHasMore] = useState<any>(false);
@@ -380,6 +374,7 @@ function EigoMasterInner() {
   // user_id: ログイン済みは auth.uid, 未ログインはlocalStorage UUID
   const [userId] = useState<any>(() => getUserId());
   const activeWalletUserId = (authUser === null || authUser === void 0 ? void 0 : authUser.id) || userId;
+  const activeWordBookUserId = activeWalletUserId;
   // ── ウォレット state ─────────────────────────────────────────
   const [wallet, setWallet] = useState<any>(() => {
     try {
@@ -526,7 +521,7 @@ function EigoMasterInner() {
   useEffect(() => {
     loadProfile().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [activeWordBookUserId]);
   useEffect(() => {
     if (!SB_READY) {
       setDbLoading(false);
@@ -534,8 +529,8 @@ function EigoMasterInner() {
     }
     const load = async () => {
       try {
-        const uid = "user_id=eq.".concat(userId);
-        const [sLines, wLines, myL, tRes, uPts, uVids, captionRows, vVotes, allVideoVotes] = await Promise.all([sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.caption&order=saved_at.desc")), sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.word&order=saved_at.desc&limit=10")), fetch("/api/list/get?userId=".concat(encodeURIComponent(userId))).then(r => r.json()), sbFrom("learning_logs").select("*&".concat(uid, "&order=created_at.asc")), sbFrom("user_points").select("*&".concat(uid)), sbFrom("user_videos").select("*&order=added_at.desc&limit=100"), sbFrom("video_captions").select("select=video_id&limit=1000"), sbFrom("video_votes").select("select=video_id,vote_type&user_id=eq.".concat(encodeURIComponent(userId), "&limit=1000")), sbFrom("video_votes").select("select=video_id,vote_type&limit=10000")]);
+        const uid = "user_id=eq.".concat(activeWordBookUserId);
+        const [sLines, wLines, myL, tRes, uPts, uVids, captionRows, vVotes, allVideoVotes] = await Promise.all([sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.caption&order=saved_at.desc")), sbFrom("saved_items").select("*&".concat(uid, "&item_type=eq.word&order=saved_at.desc&limit=10")), fetch("/api/list/get?userId=".concat(encodeURIComponent(activeWordBookUserId))).then(r => r.json()), sbFrom("learning_logs").select("*&".concat(uid, "&order=created_at.asc")), sbFrom("user_points").select("*&".concat(uid)), sbFrom("user_videos").select("*&order=added_at.desc&limit=100"), sbFrom("video_captions").select("select=video_id&limit=1000"), sbFrom("video_votes").select("select=video_id,vote_type&user_id=eq.".concat(encodeURIComponent(activeWordBookUserId), "&limit=1000")), sbFrom("video_votes").select("select=video_id,vote_type&limit=10000")]);
         // saved_items から保存済み文を復元（Phase3: 永続化）
         if (Array.isArray(sLines) && sLines.length > 0) {
           setSaved(sLines.map((r, __idx) => {
@@ -573,6 +568,8 @@ function EigoMasterInner() {
             };
           }).filter(Boolean));
           console.log('[DB] word_book restored:', wLines.length, 'items');
+        } else {
+          setWordBook([]);
         }
         // my playlist
         if (Array.isArray(myL)) {
@@ -660,7 +657,7 @@ function EigoMasterInner() {
               thumbnail: r.thumbnail,
               aiReady: readyVideoIds.has(r.video_id),
               hasTranslation: readyVideoIds.has(r.video_id),
-              shared: r.user_id !== userId,
+              shared: r.user_id !== activeWordBookUserId,
               addedAt: r.added_at,
               likes: counts ? counts.likes : Number(r.like_count || 0),
               dislikes: counts ? counts.dislikes : Number(r.dislike_count || 0)
@@ -717,9 +714,23 @@ function EigoMasterInner() {
   }, [saved]);
   useEffect(() => {
     try {
-      localStorage.setItem('em_word_book', JSON.stringify(wordBook));
+      if (!activeWordBookUserId) return;
+      if (!wordBookLoaded && (!wordBook || wordBook.length === 0)) return;
+      localStorage.setItem("em_word_book:".concat(activeWordBookUserId), JSON.stringify(wordBook));
     } catch (e) {}
-  }, [wordBook]);
+  }, [wordBook, activeWordBookUserId, wordBookLoaded]);
+  useEffect(() => {
+    try {
+      if (!activeWordBookUserId) return;
+      const s = typeof window !== 'undefined' && localStorage.getItem("em_word_book:".concat(activeWordBookUserId));
+      setWordBook(s ? JSON.parse(s) : []);
+      setWordBookLoaded(false);
+      setWordBookOffset(0);
+      setWordBookHasMore(false);
+    } catch (e) {
+      setWordBook([]);
+    }
+  }, [activeWordBookUserId]);
   // ── pts を localStorage に同期 ─────────────────────────────
   useEffect(() => {
     try {
@@ -780,22 +791,44 @@ function EigoMasterInner() {
     }
   };
   const dbSaveWord = async item => {
-    if (!SB_READY || !item?.word) return;
+    if (!item?.word) return false;
+    const normalized = {
+      ...item,
+      word: String(item.word || '').trim(),
+      savedAt: item.savedAt || Date.now()
+    };
+    if (!SB_READY) {
+      setWordBook(list => {
+        const key = normalized.word.toLowerCase();
+        return [normalized, ...(list || []).filter(w => String(w.word || '').toLowerCase() !== key)];
+      });
+      return true;
+    }
     try {
-      await fetch('/api/wordbook', {
+      const res = await fetch('/api/wordbook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, item })
+        body: JSON.stringify({ userId: activeWordBookUserId, item: normalized })
       });
-      console.log('[DB] word_book saved:', item.word);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || 'wordbook save failed');
+      const savedItem = data.item || normalized;
+      setWordBook(list => {
+        const key = String(savedItem.word || '').toLowerCase();
+        return [savedItem, ...(list || []).filter(w => String(w.word || '').toLowerCase() !== key)];
+      });
+      console.log('[DB] word_book saved:', normalized.word);
+      return true;
     } catch (e) {
       console.error('[DB] word_book save failed:', e.message);
+      t$('単語帳に保存できませんでした', 'warn');
+      return false;
     }
   };
   const dbDeleteWord = async word => {
     if (!SB_READY || !word) return;
     try {
-      await fetch("/api/wordbook?userId=".concat(encodeURIComponent(userId), "&word=").concat(encodeURIComponent(word)), { method: 'DELETE' });
+      await fetch("/api/wordbook?userId=".concat(encodeURIComponent(activeWordBookUserId), "&word=").concat(encodeURIComponent(word)), { method: 'DELETE' });
       console.log('[DB] word_book deleted:', word);
     } catch (e) {
       console.error('[DB] word_book delete failed:', e.message);
@@ -3337,8 +3370,9 @@ function EigoMasterInner() {
     }
     setWordBookLoading(true);
     try {
-      const r = await fetch("/api/wordbook?userId=".concat(encodeURIComponent(userId), "&initial=").concat(encodeURIComponent(initial), "&limit=10&offset=").concat(offset));
+      const r = await fetch("/api/wordbook?userId=".concat(encodeURIComponent(activeWordBookUserId), "&initial=").concat(encodeURIComponent(initial), "&limit=10&offset=").concat(offset));
       const data = await r.json();
+      if (!r.ok || !data?.ok) throw new Error(data?.error || 'wordbook load failed');
       if (Array.isArray(data?.items)) {
         setWordBook(prev => offset > 0 ? [...(prev || []), ...data.items] : data.items);
         setWordBookHasMore(Boolean(data.hasMore));

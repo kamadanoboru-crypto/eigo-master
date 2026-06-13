@@ -2441,14 +2441,8 @@ export function useMediaViews(deps: EigoMasterViewDeps) {
         sentence: data.sourceSentence || sentence,
         savedAt: Date.now()
       };
-      let shouldSave = false;
-      setWordBook(prev => {
-        const exists = (prev || []).some(w => String(w.word || '').toLowerCase() === clean.toLowerCase());
-        if (exists) return prev;
-        shouldSave = true;
-        return [item, ...(prev || [])];
-      });
-      if (shouldSave) dbSaveWord(item);
+      const exists = (wordBook || []).some(w => String(w.word || '').toLowerCase() === clean.toLowerCase());
+      if (!exists) await dbSaveWord(item);
     }
     setWordData(data);
     setTransLoading(false);

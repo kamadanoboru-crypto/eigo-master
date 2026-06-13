@@ -34,11 +34,13 @@ function rowToWord(row: any) {
 }
 
 async function deleteExisting(userId: string, word: string) {
+  const safeWord = word.trim();
+  if (!userId || !safeWord) return;
   const params = new URLSearchParams({
     user_id: `eq.${userId}`,
     item_type: 'eq.word',
   });
-  params.set('content->>word', `ilike.${word}`);
+  params.set('content->>word', `ilike.${safeWord}`);
   await fetch(`${SB_URL}/rest/v1/saved_items?${params.toString()}`, {
     method: 'DELETE',
     headers: headers('return=minimal'),
@@ -81,12 +83,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'POST') {
     const { userId, item } = req.body as { userId?: string; item?: any };
+    const safeUserId = String(userId || '').trim();
     const word = String(item?.word || '').trim();
-    if (!userId || !word) return res.status(400).json({ ok: false, error: 'userId and item.word required' });
+    if (!safeUserId || !word) return res.status(400).json({ ok: false, error: 'userId and item.word required' });
 
-    await deleteExisting(userId, word);
+    await deleteExisting(safeUserId, word);
     const payload = {
-      user_id: userId,
+      user_id: safeUserId,
       item_type: 'word',
       content: {
         id: item.id || `word-${word.toLowerCase()}`,
