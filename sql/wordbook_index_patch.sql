@@ -36,6 +36,39 @@ where item_type is null;
 alter table saved_items
   alter column item_type set not null;
 
+alter table saved_items enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'saved_items'
+      and policyname = 'saved_items_allow_all'
+  ) then
+    create policy "saved_items_allow_all"
+      on saved_items
+      for all
+      using (true)
+      with check (true);
+  end if;
+
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'saved_items'
+      and policyname = 'allow_all'
+  ) then
+    create policy "allow_all"
+      on saved_items
+      for all
+      using (true)
+      with check (true);
+  end if;
+end $$;
+
 create index if not exists idx_saved_items_wordbook_user_saved
   on saved_items (user_id, saved_at desc)
   where item_type = 'word';

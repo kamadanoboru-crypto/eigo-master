@@ -821,7 +821,8 @@ function EigoMasterInner() {
       return true;
     } catch (e) {
       console.error('[DB] word_book save failed:', e.message);
-      t$('単語帳に保存できませんでした', 'warn');
+      const message = String(e?.message || '');
+      t$(message.includes('saved_items') ? '単語帳DBの設定が未完了です。wordbook_index_patch.sqlを実行してください。' : '単語帳に保存できませんでした', 'warn');
       return false;
     }
   };

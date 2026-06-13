@@ -11,6 +11,16 @@ const headers = (prefer = 'return=representation') => ({
   Prefer: prefer,
 });
 
+function errorMessage(text: string) {
+  if (/row-level security|42501/i.test(text)) {
+    return 'saved_items RLS policy is missing. Run sql/wordbook_index_patch.sql in Supabase.';
+  }
+  if (/column .*item_type|PGRST204/i.test(text)) {
+    return 'saved_items columns are missing. Run sql/wordbook_index_patch.sql in Supabase.';
+  }
+  return text || 'Wordbook request failed';
+}
+
 const normalizeInitial = (value: unknown) => {
   const raw = String(value || 'all').trim().toUpperCase();
   if (raw === 'ALL') return 'all';
@@ -104,12 +114,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
     const r = await fetch(`${SB_URL}/rest/v1/saved_items`, {
       method: 'POST',
-      headers: headers(),
+      headers: headers('return=minimal'),
       body: JSON.stringify(payload),
     });
-    if (!r.ok) return res.status(500).json({ ok: false, error: await r.text().catch(() => 'Failed to save') });
-    const rows = await r.json();
-    return res.status(200).json({ ok: true, item: rowToWord(rows?.[0] || payload), storage: 'supabase' });
+    if (!r.ok) {
+      const detail = await r.text().catch(() => 'Failed to save');
+      return res.status(500).json({ ok: false, error: errorMessage(detail), detail });
+    }
+    return res.status(200).json({ ok: true, item: rowToWord(payload), storage: 'supabase' });
   }
 
   if (req.method === 'DELETE') {
