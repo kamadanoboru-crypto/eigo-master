@@ -12,20 +12,28 @@ export const SB_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL  ?? '';
 export const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
 export const SB_READY = Boolean(SB_URL && SB_ANON);
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+
+function newUserId(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c =>
+        (Number(c) ^ Math.floor(Math.random() * 16) >> Number(c) / 4).toString(16),
+      );
+}
+
 // ── ユーザーID（将来 supabase.auth.getUser() に差し替え）────
 export function getUserId(): string {
   if (typeof window === 'undefined') return 'ssr';
   try {
     let uid = localStorage.getItem('em_uid');
-    if (!uid) {
-      uid = typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : Math.random().toString(36).slice(2) + Date.now().toString(36);
+    if (!uid || !UUID_RE.test(uid)) {
+      uid = newUserId();
       localStorage.setItem('em_uid', uid);
     }
     return uid;
   } catch {
-    if (!window._emUid) window._emUid = Math.random().toString(36).slice(2);
+    if (!window._emUid || !UUID_RE.test(window._emUid)) window._emUid = newUserId();
     return window._emUid;
   }
 }
