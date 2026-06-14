@@ -25,10 +25,10 @@ type AffiliateCardProps = {
 
 const SERVICE_COPY = {
   study_sapuri: {
-    label: 'おすすめ教材',
+    label: 'TOEIC対策におすすめ',
     title: 'スタディサプリENGLISH',
     description: 'TOEIC対策、文法、リスニングを講義と演習で本格的に進めたい方に向いています。',
-    cta: 'TOEIC対策はこちら',
+    cta: 'まずは無料体験',
     color: '#B88932',
     icon: '🎓',
   },
@@ -36,7 +36,7 @@ const SERVICE_COPY = {
     label: '英会話実践におすすめ',
     title: 'Cambly',
     description: 'AIで練習した英語を、ネイティブ講師との会話で実践したい方に向いています。',
-    cta: 'ネイティブ講師と英会話を試す',
+    cta: 'Cambly無料体験はこちら',
     color: '#0F766E',
     icon: '🗣️',
   },

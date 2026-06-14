@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://eigo-master.vercel.app/</loc></url>
   <url><loc>https://eigo-master.vercel.app/about</loc></url>
@@ -10,29 +10,63 @@
   <url><loc>https://eigo-master.vercel.app/recommend/study-sapuri-english</loc></url>
   <url><loc>https://eigo-master.vercel.app/recommend/cambly</loc></url>
   <url><loc>https://eigo-master.vercel.app/recommend/english-learning-services</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/toeic-600-study-plan</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/toeic-800-study-strategy</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/toeic-part5-grammar</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/listening-improvement</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/shadowing-how-to</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/vocabulary-review</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/adult-english-beginner</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/youtube-english-learning</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/ai-english-app</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/toeic-study-habit</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/toeic-beginner-guide</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/toeic</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/studysapuri</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/cambly</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/english-conversation</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/ai-english</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/youtube-english</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/study-habit</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/study-sapuri-english-reviews</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/study-sapuri-toeic-600</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/study-sapuri-toeic-800</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/study-sapuri-toeic-beginner</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/study-sapuri-effective-use</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/study-sapuri-price-value</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/study-sapuri-working-adult</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/toeic-material-comparison</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/toeic-study-roadmap</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/study-sapuri-gold-phrase</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/cambly-reviews</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/cambly-price</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/cambly-for-beginners</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/cambly-nativecamp-comparison</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/cambly-dmm-comparison</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/cambly-toeic</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/cambly-speaking-improvement</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/cambly-merit-demerit</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/cambly-tutor-choice</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/cambly-trial-review</loc></url>
   <url><loc>https://eigo-master.vercel.app/blog/toeic-300-to-600</loc></url>
   <url><loc>https://eigo-master.vercel.app/blog/toeic-600-to-800</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/toeic-part5-basic</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/vocabulary-review-method</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/adult-english-restart</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/toeic-beginner-guide</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/toeic-listening</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/toeic-part5-strategy</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/toeic-vocabulary</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/toeic-best-books</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/toeic-working-adult</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/ai-english-learning-era</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/chatgpt-english-learning</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/ai-conversation-merits</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/ai-english-app-comparison</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/what-is-eigo-base</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/youtube-english-learning-method</loc></url>
   <url><loc>https://eigo-master.vercel.app/blog/youtube-listening-study</loc></url>
   <url><loc>https://eigo-master.vercel.app/blog/shadowing-beginner</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/ai-english-conversation</loc></url>
-  <url><loc>https://eigo-master.vercel.app/blog/english-study-habit</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/english-conversation-beginner</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/online-english-recommend</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/speaking-output-training</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/study-habit-english</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/english-app-study-plan</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/vocabulary-memorization</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/adult-english-restart</loc></url>
   <url><loc>https://eigo-master.vercel.app/blog/short-time-english-study</loc></url>
   <url><loc>https://eigo-master.vercel.app/blog/listening-problem-solution</loc></url>
   <url><loc>https://eigo-master.vercel.app/blog/grammar-learning-method</loc></url>
   <url><loc>https://eigo-master.vercel.app/blog/toeic-common-mistakes</loc></url>
   <url><loc>https://eigo-master.vercel.app/blog/english-learning-ai-era</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/study-sapuri-review-for-toeic</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/cambly-business-english</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/ai-to-human-conversation</loc></url>
+  <url><loc>https://eigo-master.vercel.app/blog/toeic-and-speaking-balance</loc></url>
 </urlset>
