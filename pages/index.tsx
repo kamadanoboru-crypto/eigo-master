@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import AffiliateCard from '../components/AffiliateCard';
 import SiteLayout from '../components/SiteLayout';
-import { blogPosts } from '../lib/blogPosts';
+import { blogPosts, getBlogPath } from '../lib/blogPosts';
 import styles from './pages.module.css';
 
 const EigoMaster = dynamic(() => import('../components/EigoMaster'), {
@@ -105,7 +105,7 @@ export default function Home() {
           <h2>最新記事</h2>
           <div className={styles.blogList}>
             {blogPosts.slice(0, 5).map((post) => (
-              <Link key={post.slug} href={`/blog/${post.slug}`} className={styles.blogCard}>
+              <Link key={post.slug} href={getBlogPath(post)} className={styles.blogCard}>
                 <h2>{post.title}</h2>
                 <p>{post.description}</p>
                 <span>記事を読む</span>

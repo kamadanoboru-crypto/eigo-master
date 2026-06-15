@@ -31,6 +31,8 @@ export type BlogPost = {
   faqs: BlogFaq[];
 };
 
+export const SITE_URL = 'https://eigo-master.vercel.app';
+
 export const blogCategories: Record<BlogCategoryKey, { label: string; description: string }> = {
   toeic: {
     label: 'TOEIC学習',
@@ -140,12 +142,23 @@ function serviceMessage(spec: PostSpec) {
   return 'Eigo Baseは、英語学習の入口を毎日作るためのサービスです。単語、文法、AI英会話、YouTube字幕学習を短く回し、必要に応じて専門教材や講師サービスにつなげることで、学習が一回きりで終わりにくくなります。';
 }
 
+function operatorView(spec: PostSpec) {
+  if (spec.service === 'study_sapuri') {
+    return 'AI英語学習アプリを作っている立場から見ると、スタディサプリENGLISHの強みは、TOEIC学習の順番が分かりやすいことです。Eigo Baseでは単語、文法、AI会話、YouTube学習を日々の補助として使えますが、TOEICの講義と演習をまとまった導線で進めたい場面では、スタディサプリENGLISHを組み合わせる価値があります。';
+  }
+  if (spec.service === 'cambly') {
+    return 'AI英語学習アプリを作っている立場から見ると、Camblyの強みは、準備した英語を人との会話で試せることです。Eigo BaseやAI英会話で表現を準備し、Camblyでネイティブ講師に伝えてみる流れは、アウトプット学習として自然です。';
+  }
+  return 'Eigo Base運営者の視点では、AIは英語学習を楽にする魔法ではなく、復習と練習量を増やす補助だと考えています。単語、文法、AI会話、YouTube学習を小さく回し、必要に応じてTOEIC教材やオンライン英会話へ進む形が現実的です。';
+}
+
 function makeSections(spec: PostSpec): BlogSection[] {
   return [
     {
       heading: sectionNames[0],
       body: [
         `${spec.keyword}で調べている人に最初に伝えたいのは、目的をはっきりさせてから学習手段を選ぶことです。${spec.angle} 英語学習では、評判のよい教材やサービスを選ぶだけでは十分ではありません。自分の現在地、使える時間、伸ばしたい技能を整理し、毎日戻れる学習導線を作ることが成果につながります。`,
+        operatorView(spec),
         serviceMessage(spec),
       ],
     },
@@ -217,7 +230,7 @@ function makeFaqs(spec: PostSpec): BlogFaq[] {
 export const blogPosts: BlogPost[] = specs.map((spec) => ({
   slug: spec.slug,
   title: spec.title,
-  description: `${spec.keyword}について、結論、メリット、デメリット、向いている人、活用方法、FAQまで英語学習者向けに解説します。`,
+  description: `${spec.goodFor}向けに、${spec.keyword}の活用法、Eigo Baseとの使い分け、注意点を英語学習者目線で解説します。`,
   lead: `${spec.keyword}で迷っている人向けに、Eigo Base運営の視点から学習目的、使い方、注意点を整理します。広告のためではなく、英語学習を続けるための判断材料として読める内容を目指します。`,
   category: spec.category,
   categories: [spec.category],
@@ -229,6 +242,24 @@ export const blogPosts: BlogPost[] = specs.map((spec) => ({
 
 export function getBlogPost(slug: string) {
   return blogPosts.find((post) => post.slug === slug);
+}
+
+export function getBlogPostByPath(parts: string[]) {
+  if (parts.length !== 2) return undefined;
+  const [category, slug] = parts;
+  return blogPosts.find((post) => post.category === category && post.slug === slug);
+}
+
+export function getBlogPath(post: BlogPost) {
+  return `/blog/${post.category}/${post.slug}`;
+}
+
+export function getBlogUrl(post: BlogPost) {
+  return `${SITE_URL}${getBlogPath(post)}`;
+}
+
+export function getBlogCategoryPath(category: BlogCategoryKey) {
+  return `/blog/${category}`;
 }
 
 export function getBlogCategories(post: BlogPost) {

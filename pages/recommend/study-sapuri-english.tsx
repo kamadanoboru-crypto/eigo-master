@@ -169,9 +169,9 @@ export default function StudySapuriEnglish() {
         <section>
           <h2>関連リンク</h2>
           <ul>
-            <li><Link href="/blog/toeic-600-study-plan">TOEIC600点を目指す初心者向け勉強法</Link></li>
-            <li><Link href="/blog/toeic-800-study-strategy">TOEIC800点を目指すための学習戦略</Link></li>
-            <li><Link href="/blog/toeic-part5-grammar">TOEIC Part5対策の基本</Link></li>
+            <li><Link href="/blog/studysapuri/study-sapuri-toeic-600">スタディサプリでTOEIC600点を目指す勉強法</Link></li>
+            <li><Link href="/blog/studysapuri/study-sapuri-toeic-800">スタディサプリでTOEIC800点は可能か</Link></li>
+            <li><Link href="/blog/toeic/toeic-part5-strategy">TOEIC Part5攻略 品詞と文法の見方</Link></li>
             <li><Link href="/recommend/cambly">Camblyの特徴と英会話実践での使い方</Link></li>
             <li><Link href="/recommend/english-learning-services">3サービスの使い分けを見る</Link></li>
             <li>

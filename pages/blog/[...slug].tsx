@@ -5,9 +5,13 @@ import SiteLayout from '../../components/SiteLayout';
 import {
   BlogCategoryKey,
   BlogPost,
+  SITE_URL,
   blogCategories,
   blogPosts,
-  getBlogPost,
+  getBlogCategoryPath,
+  getBlogPath,
+  getBlogPostByPath,
+  getBlogUrl,
   getPostsByCategory,
   getRelatedPosts,
 } from '../../lib/blogPosts';
@@ -19,8 +23,6 @@ type Props = {
   categoryKey?: BlogCategoryKey;
   categoryPosts?: BlogPost[];
 };
-
-const SITE_URL = 'https://eigo-master.vercel.app';
 
 function getAffiliateService(post: BlogPost) {
   if (post.service) return post.service;
@@ -41,7 +43,7 @@ function getAffiliateReason(post: BlogPost, footer = false) {
 }
 
 function buildStructuredData(post: BlogPost, relatedPosts: BlogPost[]) {
-  const url = `${SITE_URL}/blog/${post.slug}`;
+  const url = getBlogUrl(post);
   return [
     {
       '@context': 'https://schema.org',
@@ -82,7 +84,7 @@ function buildStructuredData(post: BlogPost, relatedPosts: BlogPost[]) {
           '@type': 'ListItem',
           position: 3,
           name: blogCategories[post.category].label,
-          item: `${SITE_URL}/blog/${post.category}`,
+          item: `${SITE_URL}${getBlogCategoryPath(post.category)}`,
         },
         { '@type': 'ListItem', position: 4, name: post.title, item: url },
       ],
@@ -94,7 +96,7 @@ function buildStructuredData(post: BlogPost, relatedPosts: BlogPost[]) {
       itemListElement: relatedPosts.map((relatedPost, index) => ({
         '@type': 'ListItem',
         position: index + 1,
-        url: `${SITE_URL}/blog/${relatedPost.slug}`,
+        url: getBlogUrl(relatedPost),
         name: relatedPost.title,
       })),
     },
@@ -104,7 +106,7 @@ function buildStructuredData(post: BlogPost, relatedPosts: BlogPost[]) {
 export default function BlogArticle({ post, relatedPosts = [], categoryKey, categoryPosts = [] }: Props) {
   if (!post && categoryKey) {
     const category = blogCategories[categoryKey];
-    const canonicalPath = `/blog/${categoryKey}`;
+    const canonicalPath = getBlogCategoryPath(categoryKey);
     const structuredData = {
       '@context': 'https://schema.org',
       '@type': 'CollectionPage',
@@ -127,7 +129,7 @@ export default function BlogArticle({ post, relatedPosts = [], categoryKey, cate
 
           <div className={styles.blogList}>
             {categoryPosts.map((categoryPost) => (
-              <Link key={categoryPost.slug} href={`/blog/${categoryPost.slug}`} className={styles.blogCard}>
+              <Link key={categoryPost.slug} href={getBlogPath(categoryPost)} className={styles.blogCard}>
                 <h2>{categoryPost.title}</h2>
                 <p>{categoryPost.description}</p>
                 <span>記事を読む</span>
@@ -151,7 +153,7 @@ export default function BlogArticle({ post, relatedPosts = [], categoryKey, cate
     <SiteLayout
       title={`${post.title} | Eigo Base`}
       description={post.description}
-      canonicalPath={`/blog/${post.slug}`}
+      canonicalPath={getBlogPath(post)}
       ogType="article"
       structuredData={structuredData}
     >
@@ -200,7 +202,7 @@ export default function BlogArticle({ post, relatedPosts = [], categoryKey, cate
           <ul>
             {relatedPosts.map((relatedPost) => (
               <li key={relatedPost.slug}>
-                <Link href={`/blog/${relatedPost.slug}`}>{relatedPost.title}</Link>
+                <Link href={getBlogPath(relatedPost)}>{relatedPost.title}</Link>
               </li>
             ))}
           </ul>
@@ -215,7 +217,7 @@ export default function BlogArticle({ post, relatedPosts = [], categoryKey, cate
         />
 
         <p>
-          <Link href={`/blog/${post.category}`}>{category.label}の記事一覧へ</Link>
+          <Link href={getBlogCategoryPath(post.category)}>{category.label}の記事一覧へ</Link>
           {' / '}
           <Link href="/blog">学習コラム一覧へ戻る</Link>
         </p>
@@ -226,20 +228,22 @@ export default function BlogArticle({ post, relatedPosts = [], categoryKey, cate
 
 export const getStaticPaths: GetStaticPaths = async () => ({
   paths: [
-    ...Object.keys(blogCategories).map((slug) => ({ params: { slug } })),
-    ...blogPosts.map((post) => ({ params: { slug: post.slug } })),
+    ...Object.keys(blogCategories).map((slug) => ({ params: { slug: [slug] } })),
+    ...blogPosts.map((post) => ({ params: { slug: [post.category, post.slug] } })),
   ],
   fallback: false,
 });
 
 export const getStaticProps: GetStaticProps<Props> = async ({ params }) => {
-  const slug = String(params?.slug || '');
-  if (blogCategories[slug as BlogCategoryKey]) {
-    const categoryKey = slug as BlogCategoryKey;
+  const slugParam = params?.slug;
+  const parts = Array.isArray(slugParam) ? slugParam.map(String) : [String(slugParam || '')];
+
+  if (parts.length === 1 && blogCategories[parts[0] as BlogCategoryKey]) {
+    const categoryKey = parts[0] as BlogCategoryKey;
     return { props: { categoryKey, categoryPosts: getPostsByCategory(categoryKey) } };
   }
 
-  const post = getBlogPost(slug);
+  const post = getBlogPostByPath(parts);
   if (!post) {
     return { notFound: true };
   }

@@ -140,8 +140,8 @@ export default function CamblyRecommend() {
         <section>
           <h2>関連リンク</h2>
           <ul>
-            <li><Link href="/blog/ai-english-app">AI英会話アプリを使うメリットと注意点</Link></li>
-            <li><Link href="/blog/shadowing-how-to">シャドーイングのやり方と続けるコツ</Link></li>
+            <li><Link href="/blog/ai-english/ai-conversation-merits">AI英会話のメリットと注意点</Link></li>
+            <li><Link href="/blog/english-conversation/shadowing-beginner">シャドーイング初心者のやさしい始め方</Link></li>
             <li><Link href="/recommend/study-sapuri-english">スタディサプリENGLISHの特徴を見る</Link></li>
             <li><Link href="/recommend/english-learning-services">3サービスの使い分けを見る</Link></li>
             <li><a href={AFFILIATE_LINKS.CAMBLY_HOME} target="_blank" rel={sponsoredRel}>Cambly公式サイト</a></li>

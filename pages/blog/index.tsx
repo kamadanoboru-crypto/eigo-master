@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import SiteLayout from '../../components/SiteLayout';
-import { blogCategories, blogPosts } from '../../lib/blogPosts';
+import { BlogCategoryKey, blogCategories, blogPosts, getBlogCategoryPath, getBlogPath } from '../../lib/blogPosts';
 import styles from '../pages.module.css';
 
 export default function BlogIndex() {
@@ -31,7 +31,7 @@ export default function BlogIndex() {
           <h2>カテゴリ</h2>
           <div className={styles.cardGrid}>
             {Object.entries(blogCategories).map(([key, category]) => (
-              <Link key={key} href={`/blog/${key}`} className={styles.blogCard}>
+              <Link key={key} href={getBlogCategoryPath(key as BlogCategoryKey)} className={styles.blogCard}>
                 <h2>{category.label}</h2>
                 <p>{category.description}</p>
                 <span>カテゴリを見る</span>
@@ -44,7 +44,7 @@ export default function BlogIndex() {
           <h2>最新記事</h2>
           <div className={styles.blogList}>
             {blogPosts.map((post) => (
-              <Link key={post.slug} href={`/blog/${post.slug}`} className={styles.blogCard}>
+              <Link key={post.slug} href={getBlogPath(post)} className={styles.blogCard}>
                 <h2>{post.title}</h2>
                 <p>{post.description}</p>
                 <span>記事を読む</span>

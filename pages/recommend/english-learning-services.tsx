@@ -138,8 +138,8 @@ export default function EnglishLearningServices() {
           <ul>
             <li><Link href="/recommend/study-sapuri-english">スタディサプリENGLISHの特徴と使い方</Link></li>
             <li><Link href="/recommend/cambly">Camblyの特徴と英会話実践での使い方</Link></li>
-            <li><Link href="/blog/toeic-600-study-plan">TOEIC600点を目指す初心者向け勉強法</Link></li>
-            <li><Link href="/blog/ai-english-app">AI英会話アプリを使うメリットと注意点</Link></li>
+            <li><Link href="/blog/studysapuri/study-sapuri-toeic-600">スタディサプリでTOEIC600点を目指す勉強法</Link></li>
+            <li><Link href="/blog/ai-english/ai-conversation-merits">AI英会話のメリットと注意点</Link></li>
           </ul>
         </section>
       </article>
