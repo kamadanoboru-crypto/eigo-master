@@ -1,8 +1,6 @@
 ﻿import { Html, Head, Main, NextScript } from 'next/document';
 
-const SITE_VERIFICATION =
-  process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
-  'qouV0nFZgZUIHnK_z9nM36M8GaWxwcjH-tMo_Z4UUZg';
+const SITE_VERIFICATION = 'oKAw7o3EL2l0zm3ZZX1OPzu41en0ugQydz454V1AwqM';
 
 export default function Document() {
   return (
