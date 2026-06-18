@@ -1,4 +1,4 @@
-import { Html, Head, Main, NextScript } from 'next/document';
+﻿import { Html, Head, Main, NextScript } from 'next/document';
 
 const SITE_VERIFICATION =
   process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ||
@@ -13,13 +13,13 @@ export default function Document() {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="English Base" />
+        <meta name="apple-mobile-web-app-title" content="eigo base" />
         {SITE_VERIFICATION ? <meta name="google-site-verification" content={SITE_VERIFICATION} /> : null}
         <meta
           name="description"
-          content="English Baseは、TOEIC、英単語、英文法、動画リスニング、AI学習アドバイスを組み合わせて、毎日の英語学習を続けやすくする学習支援サービスです。"
+          content="eigo baseは、TOEIC、英単語、英文法、動画リスニング、AI学習アドバイスを組み合わせて、毎日の英語学習を続けやすくする学習支援サービスです。"
         />
-        <meta property="og:title" content="English Base | AIと動画で続ける英語学習" />
+        <meta property="og:title" content="eigo base | AIと動画で続ける英語学習" />
         <meta
           property="og:description"
           content="TOEIC、英単語、英文法、動画リスニング、AI学習アドバイスで毎日の英語学習を続けやすくします。"
@@ -38,3 +38,4 @@ export default function Document() {
     </Html>
   );
 }
+

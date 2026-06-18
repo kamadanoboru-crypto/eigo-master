@@ -1,4 +1,4 @@
-import type { AppProps } from 'next/app';
+﻿import type { AppProps } from 'next/app';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Script from 'next/script';
@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import './globals.css';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
-const SITE_URL = 'https://eigo-master.vercel.app';
+const SITE_URL = 'https://eigobase.jp';
 
 export default function App({ Component, pageProps }: AppProps) {
   const { asPath } = useRouter();
@@ -27,16 +27,16 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="theme-color" content="#2563EB" />
         <meta
           name="description"
-          content="English Baseは、TOEIC、英単語、英文法、動画リスニング、AI学習アドバイスを組み合わせて、毎日の英語学習を続けやすくする学習支援サービスです。"
+          content="eigo baseは、TOEIC、英単語、英文法、動画リスニング、AI学習アドバイスを組み合わせて、毎日の英語学習を続けやすくする学習支援サービスです。"
         />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="English Base" />
+        <meta name="apple-mobile-web-app-title" content="eigo base" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <link rel="canonical" href={canonicalUrl} />
         <meta property="og:url" content={canonicalUrl} />
-        <title>English Base</title>
+        <title>eigo base</title>
       </Head>
       {GA_ID ? (
         <>
@@ -55,3 +55,5 @@ export default function App({ Component, pageProps }: AppProps) {
     </>
   );
 }
+
+

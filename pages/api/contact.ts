@@ -1,4 +1,4 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+﻿import type { NextApiRequest, NextApiResponse } from 'next';
 import nodemailer from 'nodemailer';
 
 const CONTACT_TO_EMAIL = process.env.CONTACT_TO_EMAIL || 'rimick.tokyo@gmail.com';
@@ -56,9 +56,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     auth: { user, pass },
   });
 
-  const subject = `English Base お問い合わせ: ${category}`;
+  const subject = `eigo base お問い合わせ: ${category}`;
   const text = [
-    'English Baseのお問い合わせフォームから送信されました。',
+    'eigo baseのお問い合わせフォームから送信されました。',
     '',
     `お名前: ${name}`,
     `返信先: ${email}`,
@@ -68,7 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     message,
   ].join('\n');
   const html = `
-    <p>English Baseのお問い合わせフォームから送信されました。</p>
+    <p>eigo baseのお問い合わせフォームから送信されました。</p>
     <dl>
       <dt>お名前</dt><dd>${escapeHtml(name)}</dd>
       <dt>返信先</dt><dd>${escapeHtml(email)}</dd>
@@ -93,3 +93,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ ok: false, error: '送信できませんでした。時間をおいて再度お試しください。' });
   }
 }
+

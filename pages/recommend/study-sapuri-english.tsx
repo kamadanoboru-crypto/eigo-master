@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import AffiliateCard from '../../components/AffiliateCard';
 import SiteLayout from '../../components/SiteLayout';
 import { AFFILIATE_LINKS } from '../../lib/affiliateLinks';
@@ -9,15 +9,15 @@ const sponsoredRel = 'nofollow sponsored noopener noreferrer';
 export default function StudySapuriEnglish() {
   return (
     <SiteLayout
-      title="スタディサプリENGLISH TOEIC対策の特徴と使い方 | English Base"
-      description="スタディサプリENGLISH TOEIC対策コースの特徴、向いている人、English Baseとの使い分け、無料体験の考え方を英語学習者向けに解説します。"
+      title="スタディサプリENGLISH TOEIC対策の特徴と使い方 | eigo base"
+      description="スタディサプリENGLISH TOEIC対策コースの特徴、向いている人、eigo baseとの使い分け、無料体験の考え方を英語学習者向けに解説します。"
     >
       <article className={styles.article}>
         <p className={styles.kicker}>おすすめ教材</p>
-        <h1>スタディサプリENGLISH TOEIC対策の特徴とEnglish Baseとの使い分け</h1>
+        <h1>スタディサプリENGLISH TOEIC対策の特徴とeigo baseとの使い分け</h1>
         <p>
           TOEIC対策を始めると、単語帳、公式問題集、講義動画、アプリなど選択肢が多く、何から使えばよいか迷いやすくなります。
-          English Baseでは、短い単語練習、Part5、動画リスニング、AI学習補助を通して、日々の学習を始めやすくすることを重視しています。
+          eigo baseでは、短い単語練習、Part5、動画リスニング、AI学習補助を通して、日々の学習を始めやすくすることを重視しています。
           一方で、TOEICの出題形式に沿って体系的に学びたい場合は、講義型の教材を併用することで学習の抜けを減らせます。
           その候補のひとつが、スタディサプリENGLISHのTOEIC対策コースです。
         </p>
@@ -73,16 +73,16 @@ export default function StudySapuriEnglish() {
         </section>
 
         <section>
-          <h2>English Baseとの使い分け</h2>
+          <h2>eigo baseとの使い分け</h2>
           <p>
-            English Baseは、英語学習を日常に戻すための入口として使いやすいサービスを目指しています。
+            eigo baseは、英語学習を日常に戻すための入口として使いやすいサービスを目指しています。
             単語を数問解く、Part5を短く確認する、YouTube動画から表現を拾う、AIに単語や英文を説明してもらうなど、
             短い時間で英語に触れる導線を作っています。
           </p>
           <p>
             スタディサプリENGLISHは、TOEIC対策を体系的に進める講義型教材として使いやすい選択肢です。
-            たとえば平日はEnglish Baseで単語とPart5の基礎確認を行い、週末にスタディサプリENGLISHで講義と演習を進める。
-            あるいは、スタディサプリENGLISHで学んだ文法項目を、English BaseのPart5や動画学習で復習する。
+            たとえば平日はeigo baseで単語とPart5の基礎確認を行い、週末にスタディサプリENGLISHで講義と演習を進める。
+            あるいは、スタディサプリENGLISHで学んだ文法項目を、eigo baseのPart5や動画学習で復習する。
             このように役割を分けると、学習が単発で終わりにくくなります。
           </p>
         </section>
@@ -148,7 +148,7 @@ export default function StudySapuriEnglish() {
           </p>
           <p>
             講義型教材は、学ぶ順番が整理されている点に強みがあります。
-            TOEIC対策では、公式問題集や講義型教材で出題形式を押さえ、English Baseのような学習アプリで短い復習を続けると、
+            TOEIC対策では、公式問題集や講義型教材で出題形式を押さえ、eigo baseのような学習アプリで短い復習を続けると、
             知識の確認と習慣化を両立しやすくなります。
           </p>
         </section>
@@ -185,3 +185,4 @@ export default function StudySapuriEnglish() {
     </SiteLayout>
   );
 }
+

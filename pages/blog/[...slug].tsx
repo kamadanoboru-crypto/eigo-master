@@ -1,4 +1,4 @@
-import type { GetStaticPaths, GetStaticProps } from 'next';
+﻿import type { GetStaticPaths, GetStaticProps } from 'next';
 import Link from 'next/link';
 import AffiliateCard from '../../components/AffiliateCard';
 import SiteLayout from '../../components/SiteLayout';
@@ -53,12 +53,12 @@ function buildStructuredData(post: BlogPost, relatedPosts: BlogPost[]) {
       url,
       author: {
         '@type': 'Organization',
-        name: 'AI英語学習アプリ Eigo Base運営',
+        name: 'eigo base編集部',
         description: '英語学習サービスを研究し、AI英語学習を実践しながら、TOEIC学習者向けコンテンツを発信しています。',
       },
       publisher: {
         '@type': 'Organization',
-        name: 'Eigo Base',
+        name: 'eigo base',
       },
       mainEntityOfPage: url,
     },
@@ -117,7 +117,7 @@ export default function BlogArticle({ post, relatedPosts = [], categoryKey, cate
 
     return (
       <SiteLayout
-        title={`${category.label}の記事一覧 | Eigo Base`}
+        title={`${category.label}の記事一覧 | eigo base`}
         description={category.description}
         canonicalPath={canonicalPath}
         structuredData={structuredData}
@@ -151,7 +151,7 @@ export default function BlogArticle({ post, relatedPosts = [], categoryKey, cate
 
   return (
     <SiteLayout
-      title={`${post.title} | Eigo Base`}
+      title={`${post.title} | eigo base`}
       description={post.description}
       canonicalPath={getBlogPath(post)}
       ogType="article"
@@ -160,7 +160,7 @@ export default function BlogArticle({ post, relatedPosts = [], categoryKey, cate
       <article className={styles.article}>
         <p className={styles.kicker}>{category.label}</p>
         <h1>{post.title}</h1>
-        <p className={styles.lastUpdate}>執筆者: AI英語学習アプリ Eigo Base運営</p>
+        <p className={styles.lastUpdate}>更新日：2026年6月19日 / 執筆者：eigo base編集部</p>
         <p>{post.lead}</p>
 
         {post.sections.map((section, sectionIndex) => (
@@ -192,7 +192,7 @@ export default function BlogArticle({ post, relatedPosts = [], categoryKey, cate
         <section className={styles.notice}>
           <h2>執筆者プロフィール</h2>
           <p>
-            AI英語学習アプリ Eigo Base運営。英語学習サービスを研究し、AI英語学習を実践しながら、
+            eigo base編集部。英語学習サービスを研究し、AI英語学習を実践しながら、
             TOEIC学習者向けコンテンツを発信しています。
           </p>
         </section>
@@ -206,6 +206,14 @@ export default function BlogArticle({ post, relatedPosts = [], categoryKey, cate
               </li>
             ))}
           </ul>
+        </section>
+
+        <section>
+          <h2>執筆情報</h2>
+          <p>この記事はeigo base編集部が作成しました。</p>
+          <p>
+            英語学習者が実際に学習へ移しやすいよう、AI英語学習、TOEIC対策、英会話実践の観点から内容を整理しています。
+          </p>
         </section>
 
         <AffiliateCard
@@ -247,5 +255,6 @@ export const getStaticProps: GetStaticProps<Props> = async ({ params }) => {
   if (!post) {
     return { notFound: true };
   }
-  return { props: { post, relatedPosts: getRelatedPosts(post, 5) } };
+  return { props: { post, relatedPosts: getRelatedPosts(post, 3) } };
 };
+

@@ -1,4 +1,4 @@
-export type BlogCategoryKey =
+﻿export type BlogCategoryKey =
   | 'toeic'
   | 'studysapuri'
   | 'cambly'
@@ -31,7 +31,7 @@ export type BlogPost = {
   faqs: BlogFaq[];
 };
 
-export const SITE_URL = 'https://eigo-master.vercel.app';
+export const SITE_URL = 'https://eigobase.jp';
 
 export const blogCategories: Record<BlogCategoryKey, { label: string; description: string }> = {
   toeic: {
@@ -108,7 +108,7 @@ const specs: PostSpec[] = [
   { slug: 'chatgpt-english-learning', title: 'ChatGPTで英語学習する方法', keyword: 'ChatGPT 英語学習', category: 'ai-english', angle: 'ChatGPTは英文添削、例文作成、会話練習に使えますが、目的を絞るほど効果が出やすくなります。', goodFor: '無料でも英語練習の量を増やしたい人', caution: '試験対策では公式教材との併用が必要です。' },
   { slug: 'ai-conversation-merits', title: 'AI英会話のメリットと注意点', keyword: 'AI英会話', category: 'ai-english', service: 'cambly', angle: 'AI英会話は緊張せずに試せる反面、人との会話で鍛えられる即興性は別に練習が必要です。', goodFor: '発話練習を始めたい初心者', caution: 'AIだけで実践経験を代替できるとは考えない方が安全です。' },
   { slug: 'ai-english-app-comparison', title: 'AI英語学習アプリ比較の見方', keyword: '英語学習アプリ AI', category: 'ai-english', angle: 'アプリ比較では、AI機能の派手さより、復習、履歴、毎日の使いやすさを見ましょう。', goodFor: '英語学習アプリを選びたい人', caution: '機能が多すぎると学習目的がぼやけることがあります。' },
-  { slug: 'what-is-eigo-base', title: 'Eigo Baseとは 毎日の英語学習を支える使い方', keyword: 'Eigo Base', category: 'ai-english', angle: 'Eigo Baseは、AI英語学習、単語、文法、YouTube字幕学習を日々の練習に戻すためのベースです。', goodFor: '英語学習を習慣化したい人', caution: '専門教材や講師サービスと役割を分けるとより使いやすくなります。' },
+  { slug: 'what-is-eigo-base', title: 'eigo baseとは 毎日の英語学習を支える使い方', keyword: 'eigo base', category: 'ai-english', angle: 'eigo baseは、AI英語学習、単語、文法、YouTube字幕学習を日々の練習に戻すためのベースです。', goodFor: '英語学習を習慣化したい人', caution: '専門教材や講師サービスと役割を分けるとより使いやすくなります。' },
   { slug: 'youtube-english-learning-method', title: 'YouTubeで英語学習する方法', keyword: 'YouTube 英語学習', category: 'youtube-english', angle: 'YouTubeは便利ですが、見て終わりにせず、字幕確認と復習に戻すことで教材になります。', goodFor: '動画で楽しく英語に触れたい人', caution: '難しすぎる動画を選ぶと継続しにくくなります。' },
   { slug: 'youtube-listening-study', title: 'YouTube字幕でリスニングを伸ばす勉強法', keyword: 'YouTube リスニング 英語', category: 'youtube-english', angle: '字幕は答え合わせに使い、最初から頼りすぎないことがリスニング改善のコツです。', goodFor: '字幕つき動画で英語を学びたい人', caution: '日本語字幕だけで理解した気になるのは避けましょう。' },
   { slug: 'shadowing-beginner', title: 'シャドーイング初心者のやさしい始め方', keyword: 'シャドーイング 初心者', category: 'english-conversation', service: 'cambly', angle: 'シャドーイングは短い素材を選び、意味を理解してから声に出すと続けやすくなります。', goodFor: '発音とリスニングを同時に練習したい人', caution: '長い素材で完璧を目指すと負担が大きくなります。' },
@@ -134,22 +134,22 @@ const sectionNames = ['結論', 'メリット', 'デメリット', '向いてい
 
 function serviceMessage(spec: PostSpec) {
   if (spec.service === 'study_sapuri') {
-    return 'スタディサプリENGLISHは、TOEIC対策や講義型学習を体系的に進めたい人にとって心強い選択肢です。English Baseで毎日の単語、文法、動画学習を回し、スタディサプリENGLISHでスコアアップに直結する講義と演習を進めると、基礎反復と本格対策の役割を分けられます。';
+    return 'スタディサプリENGLISHは、TOEIC対策や講義型学習を体系的に進めたい人にとって心強い選択肢です。eigo baseで毎日の単語、文法、動画学習を回し、スタディサプリENGLISHでスコアアップに直結する講義と演習を進めると、基礎反復と本格対策の役割を分けられます。';
   }
   if (spec.service === 'cambly') {
-    return 'Camblyは、ネイティブ講師と話す実践の場として価値があります。English BaseやAI英会話で表現を準備し、Camblyで実際に口に出し、言えなかった表現を復習に戻すと、知識が会話の中で使える形に変わっていきます。';
+    return 'Camblyは、ネイティブ講師と話す実践の場として価値があります。eigo baseやAI英会話で表現を準備し、Camblyで実際に口に出し、言えなかった表現を復習に戻すと、知識が会話の中で使える形に変わっていきます。';
   }
-  return 'Eigo Baseは、英語学習の入口を毎日作るためのサービスです。単語、文法、AI英会話、YouTube字幕学習を短く回し、必要に応じて専門教材や講師サービスにつなげることで、学習が一回きりで終わりにくくなります。';
+  return 'eigo baseは、英語学習の入口を毎日作るためのサービスです。単語、文法、AI英会話、YouTube字幕学習を短く回し、必要に応じて専門教材や講師サービスにつなげることで、学習が一回きりで終わりにくくなります。';
 }
 
 function operatorView(spec: PostSpec) {
   if (spec.service === 'study_sapuri') {
-    return 'AI英語学習アプリを作っている立場から見ると、スタディサプリENGLISHの強みは、TOEIC学習の順番が分かりやすいことです。Eigo Baseでは単語、文法、AI会話、YouTube学習を日々の補助として使えますが、TOEICの講義と演習をまとまった導線で進めたい場面では、スタディサプリENGLISHを組み合わせる価値があります。';
+    return 'AI英語学習アプリを作っている立場から見ると、スタディサプリENGLISHの強みは、TOEIC学習の順番が分かりやすいことです。eigo baseでは単語、文法、AI会話、YouTube学習を日々の補助として使えますが、TOEICの講義と演習をまとまった導線で進めたい場面では、スタディサプリENGLISHを組み合わせる価値があります。';
   }
   if (spec.service === 'cambly') {
-    return 'AI英語学習アプリを作っている立場から見ると、Camblyの強みは、準備した英語を人との会話で試せることです。Eigo BaseやAI英会話で表現を準備し、Camblyでネイティブ講師に伝えてみる流れは、アウトプット学習として自然です。';
+    return 'AI英語学習アプリを作っている立場から見ると、Camblyの強みは、準備した英語を人との会話で試せることです。eigo baseやAI英会話で表現を準備し、Camblyでネイティブ講師に伝えてみる流れは、アウトプット学習として自然です。';
   }
-  return 'Eigo Base運営者の視点では、AIは英語学習を楽にする魔法ではなく、復習と練習量を増やす補助だと考えています。単語、文法、AI会話、YouTube学習を小さく回し、必要に応じてTOEIC教材やオンライン英会話へ進む形が現実的です。';
+  return 'eigo base運営者の視点では、AIは英語学習を楽にする魔法ではなく、復習と練習量を増やす補助だと考えています。単語、文法、AI会話、YouTube学習を小さく回し、必要に応じてTOEIC教材やオンライン英会話へ進む形が現実的です。';
 }
 
 function makeSections(spec: PostSpec): BlogSection[] {
@@ -166,10 +166,10 @@ function makeSections(spec: PostSpec): BlogSection[] {
       heading: sectionNames[1],
       body: [
         `大きなメリットは、学習の迷いを減らせることです。${spec.goodFor}にとって、次に何をすればよいかが見えるだけでも継続しやすくなります。単語、文法、リスニング、発話のどこに時間を使うかを決めておけば、忙しい日でも短い練習を積み上げられます。`,
-        'また、学習内容を記録しやすい形にしておくと、復習の質が上がります。正解した問題よりも、迷った問題、聞き取れなかった音、言えなかった表現を残すことが大切です。Eigo Baseでは、日々の学習を小さく始め、復習に戻しやすい形を重視しています。',
+        'また、学習内容を記録しやすい形にしておくと、復習の質が上がります。正解した問題よりも、迷った問題、聞き取れなかった音、言えなかった表現を残すことが大切です。eigo baseでは、日々の学習を小さく始め、復習に戻しやすい形を重視しています。',
       ],
       points: [
-        { heading: '学習導線が明確になる', body: ['今日は単語、明日は文法というように行き当たりばったりで進めるより、目的別にメニューを固定した方が続きます。'] },
+        { heading: '学習ポイント', body: ['今日は単語、明日は文法というように行き当たりばったりで進めるより、目的別にメニューを固定した方が続きます。まずは「毎日戻る場所」を作り、復習対象を残すことを優先しましょう。'] },
         { heading: '復習すべき内容が見える', body: ['苦手な単語や文法、聞き取れない表現を残すと、次回の学習で迷わず戻れます。'] },
       ],
     },
@@ -184,7 +184,7 @@ function makeSections(spec: PostSpec): BlogSection[] {
       heading: sectionNames[3],
       body: [
         `向いているのは、${spec.goodFor}です。英語学習を続けるには、今の自分に必要な練習を小さく選び、無理なく繰り返すことが欠かせません。TOEICなら頻出単語とPart5、英会話なら短い自己紹介や質問、リスニングなら短い音声の聞き直しから始めると取り組みやすくなります。`,
-        'また、独学で迷いやすい人にも向いています。学習の順番が決まると、やる気に頼らなくても再開しやすくなります。Eigo Baseを毎日のベースにし、必要なタイミングでスタディサプリENGLISHやCamblyのような専門サービスを使うと、学習目的ごとの役割が分かりやすくなります。',
+        'また、独学で迷いやすい人にも向いています。学習の順番が決まると、やる気に頼らなくても再開しやすくなります。eigo baseを毎日のベースにし、必要なタイミングでスタディサプリENGLISHやCamblyのような専門サービスを使うと、学習目的ごとの役割が分かりやすくなります。',
       ],
     },
     {
@@ -198,7 +198,15 @@ function makeSections(spec: PostSpec): BlogSection[] {
       heading: sectionNames[5],
       body: [
         `実際には、1日の学習を短く分けるのがおすすめです。朝に単語を5分、昼にPart5や短い英文を10分、夜にリスニングや英会話を15分という形にすると、忙しい日でも英語に触れる回数を作れます。${spec.keyword}に関心がある人も、最初から完璧な計画を作るより、今日できる最小メニューを決める方が続きます。`,
-        '週末には、間違えた内容を見直します。なぜ間違えたのかを、単語不足、文法判断、音声認識、時間配分、発話不足に分けて考えると、次にやるべき練習が明確になります。Eigo Baseで基礎を回し、TOEIC対策はスタディサプリENGLISH、実践英会話はCamblyへつなげる流れも自然です。',
+        '週末には、間違えた内容を見直します。なぜ間違えたのかを、単語不足、文法判断、音声認識、時間配分、発話不足に分けて考えると、次にやるべき練習が明確になります。eigo baseで基礎を回し、TOEIC対策はスタディサプリENGLISH、実践英会話はCamblyへつなげる流れも自然です。',
+      ],
+      points: [
+        {
+          heading: '具体例',
+          body: [
+            `たとえば${spec.goodFor}なら、最初の1週間は新しい教材を増やさず、単語10問、文法1問、短い音声1つに絞ります。2週目から、間違えた内容だけを復習リストに戻し、必要に応じて専門教材や英会話レッスンを追加すると、学習が散らばりにくくなります。`,
+          ],
+        },
       ],
     },
     {
@@ -206,14 +214,14 @@ function makeSections(spec: PostSpec): BlogSection[] {
       body: [
         `Q. ${spec.keyword}は初心者にも使えますか。A. 使えます。ただし、初心者ほど学習範囲を広げすぎず、単語、基本文法、短い音声、短い発話から始めるのがおすすめです。`,
         'Q. どのくらいで効果が出ますか。A. 学習時間、現在の英語力、復習量によって変わります。目安としては、まず2週間から1か月、同じメニューを続けて、できることが増えたかを確認しましょう。',
-        'Q. Eigo Baseだけで十分ですか。A. 毎日の学習ベースとして役立ちますが、TOEICの本格対策やネイティブ講師との実践が必要な場合は、専門サービスを組み合わせると学習の幅が広がります。',
+        'Q. eigo baseだけで十分ですか。A. 毎日の学習ベースとして役立ちますが、TOEICの本格対策やネイティブ講師との実践が必要な場合は、専門サービスを組み合わせると学習の幅が広がります。',
       ],
     },
     {
       heading: sectionNames[7],
       body: [
         `${spec.title}について考えるときは、評判や料金だけでなく、自分の目的に合った学習導線を作れるかを見ましょう。英語学習は、読む、聞く、覚える、話すを一度に完璧にする必要はありません。今日やることを小さく決め、復習に戻し、必要に応じて専門サービスへ進むことが大切です。`,
-        'Eigo Baseは、毎日の英語学習を支えるベースとして、単語、文法、AI、YouTube学習をつなげます。TOEICスコアアップを目指すならスタディサプリENGLISH、英語を実際に使う練習へ進むならCamblyというように、目的に合わせて無理なく組み合わせていきましょう。',
+        'eigo baseは、毎日の英語学習を支えるベースとして、単語、文法、AI、YouTube学習をつなげます。TOEICスコアアップを目指すならスタディサプリENGLISH、英語を実際に使う練習へ進むならCamblyというように、目的に合わせて無理なく組み合わせていきましょう。',
       ],
     },
   ];
@@ -222,7 +230,7 @@ function makeSections(spec: PostSpec): BlogSection[] {
 function makeFaqs(spec: PostSpec): BlogFaq[] {
   return [
     { question: `${spec.keyword}は初心者にも向いていますか？`, answer: `初心者にも向いています。ただし、最初は範囲を広げすぎず、${spec.goodFor}に必要な基礎練習から始めるのがおすすめです。` },
-    { question: 'Eigo Baseとはどう使い分ければよいですか？', answer: 'Eigo Baseは毎日の単語、文法、AI英会話、YouTube学習のベースとして使い、TOEIC対策や実践英会話が必要な場面で専門サービスを組み合わせると自然です。' },
+    { question: 'eigo baseとはどう使い分ければよいですか？', answer: 'eigo baseは毎日の単語、文法、AI英会話、YouTube学習のベースとして使い、TOEIC対策や実践英会話が必要な場面で専門サービスを組み合わせると自然です。' },
     { question: '料金やプランはこの記事だけで判断できますか？', answer: '料金、プラン、キャンペーンは変わる場合があります。申し込み前には必ず公式サイトの最新情報を確認してください。' },
   ];
 }
@@ -230,8 +238,8 @@ function makeFaqs(spec: PostSpec): BlogFaq[] {
 export const blogPosts: BlogPost[] = specs.map((spec) => ({
   slug: spec.slug,
   title: spec.title,
-  description: `${spec.goodFor}向けに、${spec.keyword}の活用法、Eigo Baseとの使い分け、注意点を英語学習者目線で解説します。`,
-  lead: `${spec.keyword}で迷っている人向けに、Eigo Base運営の視点から学習目的、使い方、注意点を整理します。広告のためではなく、英語学習を続けるための判断材料として読める内容を目指します。`,
+  description: `${spec.goodFor}向けに、${spec.keyword}の活用法、eigo baseとの使い分け、注意点を英語学習者目線で解説します。`,
+  lead: `${spec.keyword}で迷っている人向けに、eigo base運営の視点から学習目的、使い方、注意点を整理します。広告のためではなく、英語学習を続けるための判断材料として読める内容を目指します。`,
   category: spec.category,
   categories: [spec.category],
   targetKeyword: spec.keyword,
@@ -275,3 +283,5 @@ export function getRelatedPosts(post: BlogPost, limit = 5) {
   const fallback = blogPosts.filter((item) => item.slug !== post.slug && item.category !== post.category);
   return [...sameCategory, ...fallback].slice(0, limit);
 }
+
+

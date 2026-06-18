@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import AffiliateCard from '../../components/AffiliateCard';
 import SiteLayout from '../../components/SiteLayout';
 import { AFFILIATE_LINKS } from '../../lib/affiliateLinks';
@@ -9,15 +9,15 @@ const sponsoredRel = 'nofollow sponsored noopener noreferrer';
 export default function CamblyRecommend() {
   return (
     <SiteLayout
-      title="Camblyの特徴と英会話実践での使い方 | English Base"
-      description="Camblyの特徴、ネイティブ講師との英会話、English BaseやスタディサプリENGLISHとの使い分け、向いている人を解説します。"
+      title="Camblyの特徴と英会話実践での使い方 | eigo base"
+      description="Camblyの特徴、ネイティブ講師との英会話、eigo baseやスタディサプリENGLISHとの使い分け、向いている人を解説します。"
     >
       <article className={styles.article}>
         <p className={styles.kicker}>おすすめ学習サービス</p>
         <h1>Camblyの特徴と英会話実践での使い方</h1>
         <p>
           英単語や文法を学んでいても、実際に英語を話す場面になると言葉が出てこないことがあります。
-          English Baseでは、AI英会話や単語、Part5、動画リスニングを通して、英語に触れる回数を増やすことを重視しています。
+          eigo baseでは、AI英会話や単語、Part5、動画リスニングを通して、英語に触れる回数を増やすことを重視しています。
           その次のステップとして、実際の講師と話す練習を取り入れたい人に候補になるのがCamblyです。
           Camblyは、ネイティブ講師とのオンライン英会話を提供するサービスで、会話量を増やしたい学習者に向いています。
         </p>
@@ -71,16 +71,16 @@ export default function CamblyRecommend() {
         </section>
 
         <section>
-          <h2>English Baseとの使い分け</h2>
+          <h2>eigo baseとの使い分け</h2>
           <p>
-            English Baseは、単語、文法、リスニング、AI学習補助を使って、毎日少しずつ英語に触れるためのサービスです。
+            eigo baseは、単語、文法、リスニング、AI学習補助を使って、毎日少しずつ英語に触れるためのサービスです。
             AI英会話では、間違いを恐れずに短い英文を試し、表現を確認できます。
             ただし、AIとの練習だけでは、相手の反応を見ながら話す緊張感や、予想外の返答に対応する経験は不足しやすくなります。
           </p>
           <p>
             Camblyは、その不足を補う実践の場として使えます。
-            English Baseで単語や表現を準備し、AI英会話で一度試し、Camblyで講師と話す。
-            レッスン後に、言えなかった表現をEnglish Baseの復習へ戻す。
+            eigo baseで単語や表現を準備し、AI英会話で一度試し、Camblyで講師と話す。
+            レッスン後に、言えなかった表現をeigo baseの復習へ戻す。
             この流れにすると、インプットとアウトプットがつながります。
           </p>
         </section>
@@ -110,7 +110,7 @@ export default function CamblyRecommend() {
           <h3>向かない人</h3>
           <p>
             英単語や中学英文法がほとんど分からない段階では、いきなり英会話だけを増やしても負担が大きい場合があります。
-            まずEnglish Baseで基礎表現を確認し、スタディサプリENGLISHや教材で文法・リスニングを整理してから使うと、
+            まずeigo baseで基礎表現を確認し、スタディサプリENGLISHや教材で文法・リスニングを整理してから使うと、
             レッスン時間をより有効に使いやすくなります。
           </p>
         </section>
@@ -151,3 +151,4 @@ export default function CamblyRecommend() {
     </SiteLayout>
   );
 }
+

@@ -1,30 +1,47 @@
-import dynamic from 'next/dynamic';
+﻿import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useState } from 'react';
 import AffiliateCard from '../components/AffiliateCard';
 import SiteLayout from '../components/SiteLayout';
-import { blogPosts, getBlogPath } from '../lib/blogPosts';
+import { blogPosts, getBlogCategoryPath, getBlogPath } from '../lib/blogPosts';
 import styles from './pages.module.css';
 
 const EigoMaster = dynamic(() => import('../components/EigoMaster'), {
   ssr: false,
   loading: () => (
     <div className={styles.appLoading}>
-      <div className={styles.appLoadingTitle}>English Base</div>
+      <div className={styles.appLoadingTitle}>eigo base</div>
       <div>学習アプリを読み込んでいます...</div>
     </div>
   ),
 });
 
 const description =
-  'English Baseは、TOEIC、英単語、英文法、動画リスニング、AI学習アドバイスを組み合わせて、毎日の英語学習を続けやすくする学習支援サービスです。';
+  'eigo baseは、TOEIC、英単語、英文法、動画リスニング、AI学習アドバイスを組み合わせて、毎日の英語学習を続けやすくする学習支援サービスです。';
 
 const faqPreview = [
   ['無料で使えますか？', '基本的な学習機能は利用できます。一部のAI生成や高度な処理では、アプリ内のコインを使う場合があります。'],
   ['TOEIC初心者でも使えますか？', 'はい。単語、Part5、短いリスニングから始められるため、基礎固めにも使えます。'],
   ['AIの答えは正確ですか？', 'AIの説明は学習補助です。重要な内容は公式教材や信頼できる資料でも確認してください。'],
   ['スマホでも使えますか？', 'スマホ表示を前提に調整しています。短時間の復習や動画学習にも使いやすい構成です。'],
+];
+
+const popularPosts = [
+  'study-sapuri-toeic-600',
+  'cambly-reviews',
+  'toeic-beginner-guide',
+  'ai-conversation-merits',
+  'youtube-english-learning-method',
+]
+  .map((slug) => blogPosts.find((post) => post.slug === slug))
+  .filter((post): post is (typeof blogPosts)[number] => Boolean(post));
+
+const homeCategories = [
+  { label: 'TOEIC', href: getBlogCategoryPath('toeic'), description: '初心者向け勉強法、Part5、リスニング、教材選びを整理します。' },
+  { label: '英単語', href: '/blog/study-habit/vocabulary-memorization', description: '英単語暗記と復習の考え方を、短時間学習に落とし込みます。' },
+  { label: 'リスニング', href: getBlogCategoryPath('youtube-english'), description: 'YouTube字幕学習や聞き取れない理由の分解を扱います。' },
+  { label: 'AI英語学習', href: getBlogCategoryPath('ai-english'), description: 'AI英会話、ChatGPT、AI英語学習アプリの使い方を解説します。' },
 ];
 
 export default function Home() {
@@ -35,16 +52,16 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>English Base | AIと動画で続ける英語学習</title>
+        <title>eigo base | AIと動画で続ける英語学習</title>
         <meta name="description" content={description} />
       </Head>
-      <SiteLayout title="English Base | AIと動画で続ける英語学習" description={description}>
+      <SiteLayout title="eigo base | AIと動画で続ける英語学習" description={description}>
         <section className={styles.hero}>
           <div>
             <p className={styles.kicker}>英語学習メディア + 学習アプリ</p>
             <h1>AIと動画で続ける英語学習</h1>
             <p>
-              English Baseは、英単語、TOEIC Part5、動画リスニング、ニュース読解、AI学習アドバイスを
+              eigo baseは、英単語、TOEIC Part5、動画リスニング、ニュース読解、AI学習アドバイスを
               組み合わせた学習支援サービスです。短い時間でも練習し、間違えた内容を復習し、
               英語に触れる習慣を作ることを目的にしています。
             </p>
@@ -56,9 +73,9 @@ export default function Home() {
         </section>
 
         <section className={styles.section}>
-          <h2>English Baseとは</h2>
+          <h2>eigo baseとは</h2>
           <p>
-            English Baseは、英語学習を続けやすくするためのAI学習サービスです。
+            eigo baseは、英語学習を続けやすくするためのAI学習サービスです。
             TOEIC単語、Part5対策、YouTubeリスニング、AI英会話、学習履歴を組み合わせ、
             短い時間でも「学ぶ、解く、聞く、見直す」を繰り返せる場所を目指しています。
           </p>
@@ -102,6 +119,19 @@ export default function Home() {
         </section>
 
         <section className={styles.section}>
+          <h2>人気記事</h2>
+          <div className={styles.blogList}>
+            {popularPosts.map((post) => (
+              <Link key={post.slug} href={getBlogPath(post)} className={styles.blogCard}>
+                <h2>{post.title}</h2>
+                <p>{post.description}</p>
+                <span>記事を読む</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.section}>
           <h2>最新記事</h2>
           <div className={styles.blogList}>
             {blogPosts.slice(0, 5).map((post) => (
@@ -116,9 +146,22 @@ export default function Home() {
         </section>
 
         <section className={styles.section}>
+          <h2>カテゴリー</h2>
+          <div className={styles.cardGrid}>
+            {homeCategories.map((category) => (
+              <Link key={category.label} href={category.href} className={styles.blogCard}>
+                <h2>{category.label}</h2>
+                <p>{category.description}</p>
+                <span>カテゴリを見る</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className={styles.section}>
           <h2>おすすめ学習サービス</h2>
           <p>
-            English Baseで単語やPart5の基礎を確認し、TOEICの本格対策には講義型教材を併用する方法もあります。
+            eigo baseで単語やPart5の基礎を確認し、TOEICの本格対策には講義型教材を併用する方法もあります。
             AI英会話に慣れてきたら、ネイティブ講師との実践練習へ進む選択肢もあります。
           </p>
           <AffiliateCard
@@ -137,7 +180,7 @@ export default function Home() {
           />
           <p>
             <Link href="/recommend/english-learning-services" className={styles.textLink}>
-              English Base・スタディサプリENGLISH・Camblyの使い分けを見る
+              eigo base・スタディサプリENGLISH・Camblyの使い分けを見る
             </Link>
           </p>
         </section>
@@ -155,3 +198,4 @@ export default function Home() {
     </>
   );
 }
+

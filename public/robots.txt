@@ -1,4 +1,5 @@
-User-agent: *
+﻿User-agent: *
 Allow: /
 
-Sitemap: https://eigo-master.vercel.app/sitemap.xml
+Sitemap: https://eigobase.jp/sitemap.xml
+

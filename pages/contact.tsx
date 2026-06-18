@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+﻿import { FormEvent, useState } from 'react';
 import SiteLayout from '../components/SiteLayout';
 import styles from './pages.module.css';
 
@@ -40,13 +40,13 @@ export default function Contact() {
 
   return (
     <SiteLayout
-      title="お問い合わせ | English Base"
-      description="English Baseへのお問い合わせフォームです。不具合報告、掲載内容の確認、サービスへのご意見を送信できます。"
+      title="お問い合わせ | eigo base"
+      description="eigo baseへのお問い合わせフォームです。不具合報告、掲載内容の確認、サービスへのご意見を送信できます。"
     >
       <article className={styles.article}>
         <h1>お問い合わせ</h1>
         <p>
-          English Baseへのご質問、不具合報告、掲載内容に関するご連絡は、以下のフォームから送信してください。
+          eigo baseへのご質問、不具合報告、掲載内容に関するご連絡は、以下のフォームから送信してください。
           内容を確認し、必要に応じて返信またはサービス改善の参考にします。
         </p>
 
@@ -99,3 +99,4 @@ export default function Contact() {
     </SiteLayout>
   );
 }
+

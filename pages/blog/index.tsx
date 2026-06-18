@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import SiteLayout from '../../components/SiteLayout';
 import { BlogCategoryKey, blogCategories, blogPosts, getBlogCategoryPath, getBlogPath } from '../../lib/blogPosts';
 import styles from '../pages.module.css';
@@ -8,22 +8,22 @@ export default function BlogIndex() {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
     name: '英語学習コラム',
-    description: 'TOEIC、スタディサプリENGLISH、Cambly、AI英語学習、YouTube英語学習を扱うEigo Baseの学習メディアです。',
-    url: 'https://eigo-master.vercel.app/blog',
+    description: 'TOEIC、スタディサプリENGLISH、Cambly、AI英語学習、YouTube英語学習を扱うeigo baseの学習メディアです。',
+    url: 'https://eigobase.jp/blog',
   };
 
   return (
     <SiteLayout
-      title="英語学習コラム | Eigo Base"
-      description="TOEIC、スタディサプリENGLISH、Cambly、AI英語学習、YouTube英語学習を扱うEigo Baseの英語学習メディアです。"
+      title="英語学習コラム | eigo base"
+      description="TOEIC、スタディサプリENGLISH、Cambly、AI英語学習、YouTube英語学習を扱うeigo baseの英語学習メディアです。"
       canonicalPath="/blog"
       structuredData={structuredData}
     >
       <article className={styles.article}>
-        <p className={styles.kicker}>Eigo Base 英語学習メディア</p>
+        <p className={styles.kicker}>eigo base 英語学習メディア</p>
         <h1>英語学習コラム</h1>
         <p>
-          Eigo Baseでは、AI英語学習、TOEIC対策、英会話、YouTube字幕学習、英語教材比較を扱います。
+          eigo baseでは、AI英語学習、TOEIC対策、英会話、YouTube字幕学習、英語教材比較を扱います。
           広告のための記事ではなく、英語学習者が次の一歩を決めやすくなる記事を目指しています。
         </p>
 
@@ -56,3 +56,5 @@ export default function BlogIndex() {
     </SiteLayout>
   );
 }
+
+
