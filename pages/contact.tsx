@@ -42,6 +42,7 @@ export default function Contact() {
     <SiteLayout
       title="お問い合わせ | eigo base"
       description="eigo baseへのお問い合わせフォームです。不具合報告、掲載内容の確認、サービスへのご意見を送信できます。"
+      canonicalPath="/contact"
     >
       <article className={styles.article}>
         <h1>お問い合わせ</h1>

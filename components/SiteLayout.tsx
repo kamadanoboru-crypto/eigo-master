@@ -44,7 +44,7 @@ export default function SiteLayout({
           <Link href="/" className={styles.logo}>eigo base</Link>
           <nav className={styles.nav} aria-label="メインナビゲーション">
             <Link href="/">ホーム</Link>
-            <Link href="/blog">学習コラム</Link>
+            <Link href="/columns">学習コラム</Link>
             <Link href="/recommend/english-learning-services">おすすめ教材</Link>
             <Link href="/faq">FAQ</Link>
             <Link href="/about">運営者情報</Link>
@@ -55,7 +55,7 @@ export default function SiteLayout({
         <footer className={styles.footer}>
           <div className={styles.footerLinks}>
             <Link href="/">ホーム</Link>
-            <Link href="/blog">学習コラム</Link>
+            <Link href="/columns">学習コラム</Link>
             <Link href="/recommend/english-learning-services">おすすめ教材</Link>
             <Link href="/faq">FAQ</Link>
             <Link href="/about">運営者情報</Link>
@@ -64,7 +64,7 @@ export default function SiteLayout({
             <Link href="/sitemap">サイトマップ</Link>
             <Link href="/contact">お問い合わせ</Link>
           </div>
-          <p>&copy; 2026 eigo base. 英語学習を毎日の習慣にするための学習支援サービスです。</p>
+          <p>&copy; eigo base. 英語学習を毎日の習慣にするための学習支援サービスです。</p>
         </footer>
       </div>
     </>

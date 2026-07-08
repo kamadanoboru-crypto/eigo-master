@@ -5,6 +5,7 @@ import { useState } from 'react';
 import AffiliateCard from '../components/AffiliateCard';
 import SiteLayout from '../components/SiteLayout';
 import { blogPosts, getBlogCategoryPath, getBlogPath } from '../lib/blogPosts';
+import { columnArticles, getColumnPath } from '../lib/columns';
 import styles from './pages.module.css';
 
 const EigoMaster = dynamic(() => import('../components/EigoMaster'), {
@@ -67,7 +68,7 @@ export default function Home() {
             </p>
             <div className={styles.heroActions}>
               <button className={styles.primaryButton} onClick={() => setShowApp(true)}>学習アプリを開く</button>
-              <Link href="/blog" className={styles.secondaryButton}>学習コラムを読む</Link>
+              <Link href="/columns" className={styles.secondaryButton}>学習コラムを読む</Link>
             </div>
           </div>
         </section>
@@ -134,15 +135,15 @@ export default function Home() {
         <section className={styles.section}>
           <h2>最新記事</h2>
           <div className={styles.blogList}>
-            {blogPosts.slice(0, 5).map((post) => (
-              <Link key={post.slug} href={getBlogPath(post)} className={styles.blogCard}>
-                <h2>{post.title}</h2>
-                <p>{post.description}</p>
+            {columnArticles.slice(0, 5).map((article) => (
+              <Link key={article.slug} href={getColumnPath(article)} className={styles.blogCard}>
+                <h2>{article.title}</h2>
+                <p>{article.description}</p>
                 <span>記事を読む</span>
               </Link>
             ))}
           </div>
-          <p><Link href="/blog" className={styles.textLink}>すべての学習コラムを見る</Link></p>
+          <p><Link href="/columns" className={styles.textLink}>すべての学習コラムを見る</Link></p>
         </section>
 
         <section className={styles.section}>

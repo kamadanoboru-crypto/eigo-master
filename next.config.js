@@ -2,6 +2,16 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'eigo-master.vercel.app' }],
+        destination: 'https://eigobase.jp/:path*',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {
